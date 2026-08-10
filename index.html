@@ -141,6 +141,17 @@
   .bacaan-list li.b-perhatian .tanda{background:var(--warn);}
   .bacaan-list li.b-catatan .tanda{background:var(--accent);}
   .bacaan-list li.b-aman .tanda{background:var(--ok);}
+  /* ---------- GRAFIK RIWAYAT ---------- */
+  .riwayat{border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; margin-top:14px; background:var(--white);}
+  .riwayat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:26px;}
+  .chart-box{min-width:0;}
+  .chart-title{font-size:13px; font-weight:700;}
+  .chart-sub{font-size:11.5px; color:var(--gray-500); margin-top:3px; margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .kunci{width:14px; height:3px; border-radius:2px; display:inline-block;}
+  .kunci.k-jual{background:var(--accent);}
+  .kunci.k-buy{background:var(--gray-500);}
+  .chart-box svg{display:block; overflow:visible;}
+
   .bacaan-kosong{
     border:1px dashed var(--gray-200); border-radius:var(--radius); padding:18px;
     margin-top:16px; font-size:12.5px; color:var(--gray-400); text-align:center;
@@ -519,6 +530,7 @@
     <div id="sheetStatus"></div>
     <div id="importPanel"></div>
     <div id="bacaanPanel"></div>
+    <div id="riwayatPanel"></div>
 
     <div class="table-scroll">
     <table class="branch-table">
@@ -901,6 +913,7 @@ function renderBranches(){
   updateRetailSourceTag();
   renderSheetStatus();
   renderBacaan();
+  renderRiwayat();
   renderAttention();
 }
 renderBranches();
@@ -944,6 +957,7 @@ let importMap = null;    // {tanggal, cabang, transaksi, omzet}
 let importedFrom = null; // nama file yang sedang dipakai
 
 let sheetConn = null; // {url, map, lastFetch}
+let riwayat = [];     // [{label, kunci, tx, omzet, buyback}] per tanggal
 
 function openImport(){
   if(currentRole!=='admin') return;
@@ -1236,6 +1250,22 @@ function applyImport(){
     };
   });
 
+  // kumpulkan riwayat per tanggal untuk grafik
+  riwayat = [];
+  if(mTgl > -1){
+    const perTgl = {};
+    rows.forEach(r=>{
+      const label = String(r[mTgl]||'').trim();
+      if(!label) return;
+      if(!perTgl[label]) perTgl[label] = {label, kunci: tanggalKunci(label), tx:0, omzet:0, buyback:0, adaOmzet:false, adaBuyback:false};
+      const d = perTgl[label];
+      d.tx += toNumber(r[mTx]);
+      if(mOmz > -1){ d.omzet += toNumber(r[mOmz]); d.adaOmzet = true; }
+      if(mBuy > -1){ d.buyback += toNumber(r[mBuy]); d.adaBuyback = true; }
+    });
+    riwayat = Object.values(perTgl).sort((a,b)=>a.kunci-b.kunci);
+  }
+
   if(!hasil.length){
     document.getElementById('importPanel').innerHTML =
       `<div class="import-panel"><div class="import-error">Tidak ada baris yang bisa dipakai. Cek lagi pilihan kolom nama cabang.</div></div>`;
@@ -1258,6 +1288,7 @@ function resetImport(){
   branches.length = 0;
   branchesDemo.forEach(b=>branches.push({...b}));
   importedFrom = null;
+  riwayat = [];
   document.getElementById('importPanel').innerHTML = '';
   renderSheetStatus();
   renderBranches();
@@ -1368,6 +1399,103 @@ function renderBacaan(){
     <ul class="bacaan-list">
       ${temuan.map(t=>`<li class="b-${t.tingkat}"><span class="tanda"></span><span>${esc(t.teks)}</span></li>`).join('')}
     </ul>
+  </div>`;
+}
+
+/* =========================================================
+   GRAFIK RIWAYAT
+   ========================================================= */
+function ringkasRupiah(n){
+  if(n >= 1000000000) return (n/1000000000).toFixed(1).replace('.',',') + ' M';
+  if(n >= 1000000) return Math.round(n/1000000) + ' jt';
+  if(n >= 1000) return Math.round(n/1000) + ' rb';
+  return String(n);
+}
+
+function grafikBatang(data, w, h){
+  const padL = 34, padB = 22, padT = 10, padR = 6;
+  const iw = w - padL - padR, ih = h - padB - padT;
+  const maks = Math.max(...data.map(d=>d.tx), 1);
+  const lebar = iw / data.length;
+  const batang = lebar * 0.52;
+  const garis = [0, Math.round(maks/2), maks].map(v=>{
+    const y = padT + ih - (v/maks)*ih;
+    return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--gray-100)" stroke-width="1"/>
+            <text x="${padL-6}" y="${y+3.5}" text-anchor="end" font-size="9" fill="var(--gray-400)">${v}</text>`;
+  }).join('');
+  const isi = data.map((d,i)=>{
+    const tinggi = (d.tx/maks)*ih;
+    const x = padL + i*lebar + (lebar-batang)/2;
+    const y = padT + ih - tinggi;
+    const akhir = i === data.length-1;
+    return `<rect x="${x}" y="${y}" width="${batang}" height="${Math.max(tinggi,1)}" rx="3"
+              fill="${akhir ? 'var(--accent)' : 'var(--gray-200)'}"><title>${esc(d.label)}: ${d.tx} transaksi</title></rect>
+            <text x="${x+batang/2}" y="${h-7}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${esc(d.label.slice(0,5))}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img">${garis}${isi}</svg>`;
+}
+
+function grafikGaris(data, w, h){
+  const padL = 42, padB = 22, padT = 10, padR = 6;
+  const iw = w - padL - padR, ih = h - padB - padT;
+  const maks = Math.max(...data.map(d=>Math.max(d.omzet, d.buyback)), 1);
+  const x = i => data.length === 1 ? padL + iw/2 : padL + (i/(data.length-1))*iw;
+  const y = v => padT + ih - (v/maks)*ih;
+  const jalur = key => data.map((d,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`).join(' ');
+  const titik = (key, warna) => data.map((d,i)=>
+    `<circle cx="${x(i).toFixed(1)}" cy="${y(d[key]).toFixed(1)}" r="3" fill="${warna}"><title>${esc(d.label)}: Rp${ringkasRupiah(d[key])}</title></circle>`
+  ).join('');
+  const garis = [0, maks].map(v=>{
+    const yy = y(v);
+    return `<line x1="${padL}" y1="${yy}" x2="${w-padR}" y2="${yy}" stroke="var(--gray-100)" stroke-width="1"/>
+            <text x="${padL-6}" y="${yy+3.5}" text-anchor="end" font-size="9" fill="var(--gray-400)">${ringkasRupiah(v)}</text>`;
+  }).join('');
+  const label = data.map((d,i)=>`<text x="${x(i).toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${esc(d.label.slice(0,5))}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img">
+    ${garis}
+    <path d="${jalur('omzet')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="${jalur('buyback')}" fill="none" stroke="var(--gray-500)" stroke-width="2" stroke-dasharray="4 3" stroke-linejoin="round"/>
+    ${titik('omzet','var(--accent)')}${titik('buyback','var(--gray-500)')}
+    ${label}
+  </svg>`;
+}
+
+function renderRiwayat(){
+  if(!appReady) return;
+  const box = document.getElementById('riwayatPanel');
+  if(!box) return;
+
+  if(!riwayat.length){
+    box.innerHTML = (sheetConn || importedFrom)
+      ? `<div class="bacaan-kosong">Sumber data tidak punya kolom tanggal, jadi riwayat harian belum bisa ditampilkan.</div>`
+      : '';
+    return;
+  }
+
+  const adaUang = riwayat.some(d=>d.adaOmzet || d.adaBuyback);
+  const total = riwayat[riwayat.length-1];
+  const awal = riwayat[0];
+  const bedaTx = total.tx - awal.tx;
+
+  box.innerHTML = `
+  <div class="riwayat">
+    <div class="bacaan-head">
+      <span class="bacaan-title">Riwayat harian</span>
+      <span class="bacaan-note">${riwayat.length} hari terbaca dari sumber data</span>
+    </div>
+    <div class="riwayat-grid">
+      <div class="chart-box">
+        <div class="chart-title">Transaksi seluruh cabang</div>
+        <div class="chart-sub">${total.tx} transaksi hari terakhir, ${bedaTx>=0?'naik':'turun'} ${Math.abs(bedaTx)} dibanding hari pertama</div>
+        ${grafikBatang(riwayat, 340, 150)}
+      </div>
+      ${adaUang ? `
+      <div class="chart-box">
+        <div class="chart-title">Penjualan dan buyback</div>
+        <div class="chart-sub"><span class="kunci k-jual"></span>Penjualan <span class="kunci k-buy"></span>Buyback</div>
+        ${grafikGaris(riwayat, 340, 150)}
+      </div>` : ''}
+    </div>
   </div>`;
 }
 
