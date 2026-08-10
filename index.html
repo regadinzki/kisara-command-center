@@ -151,6 +151,33 @@
   .kunci.k-jual{background:var(--accent);}
   .kunci.k-buy{background:var(--gray-500);}
   .chart-box svg{display:block; overflow:visible;}
+  .bar-grup:hover .bar{filter:brightness(0.94);}
+
+  /* sparkline di dalam tabel */
+  .spark{display:block; overflow:visible;}
+  .spark-kosong{color:var(--gray-400); font-size:12px;}
+
+  /* pemilih tanggal */
+  .pilih-tanggal{display:flex; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap;}
+  .pilih-tanggal label{font-size:11.5px; color:var(--gray-500);}
+  .pilih-tanggal select{
+    border:1px solid var(--line); border-radius:8px; padding:7px 10px;
+    font-size:13px; font-family:inherit; background:var(--white); color:var(--black); font-weight:600;
+  }
+  .pilih-tanggal select:focus{outline:none; border-color:var(--accent);}
+  .pilih-hint{font-size:11.5px; color:var(--gray-400);}
+
+  /* gerakan sekali jalan saat pertama muncul */
+  @keyframes tumbuhBatang{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+  @keyframes gambarGaris{from{stroke-dashoffset:900;}to{stroke-dashoffset:0;}}
+  @keyframes munculHalus{from{opacity:0;}to{opacity:1;}}
+  .chart-box rect.bar{transform-box:fill-box; transform-origin:bottom; animation:tumbuhBatang .45s cubic-bezier(.2,.7,.3,1) both;}
+  .chart-box path.garis{stroke-dasharray:900; animation:gambarGaris .8s ease-out both;}
+  .chart-box path.area{animation:munculHalus .8s ease-out both;}
+  .spark path{stroke-dasharray:300; animation:gambarGaris .7s ease-out both;}
+  @media (prefers-reduced-motion: reduce){
+    .chart-box rect.bar, .chart-box path.garis, .chart-box path.area, .spark path{animation:none; stroke-dasharray:none;}
+  }
 
   .bacaan-kosong{
     border:1px dashed var(--gray-200); border-radius:var(--radius); padding:18px;
@@ -537,9 +564,11 @@
     <div id="bacaanPanel"></div>
     <div id="riwayatPanel"></div>
 
+    <div class="stamp" id="ringkasSumber"></div>
+    <div id="pilihTanggal"></div>
     <div class="table-scroll">
     <table class="branch-table">
-      <thead><tr><th>Cabang</th><th>Transaksi hari ini</th><th>Estimasi omzet</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Cabang</th><th>Transaksi</th><th>Tren</th><th>Estimasi omzet</th><th>Status</th><th></th></tr></thead>
       <tbody id="branchBody"></tbody>
     </table>
     </div>
@@ -869,11 +898,27 @@ function deltaHtml(b){
   return `<span class="delta ${cls}" title="${label}">${Math.abs(d)}<span class="arrow">${arrow}</span></span>`;
 }
 
+function sparkline(deret, posisi){
+  if(!Array.isArray(deret) || deret.length < 2) return '<span class="spark-kosong">&ndash;</span>';
+  const w = 62, h = 20, pad = 3;
+  const maks = Math.max(...deret), min = Math.min(...deret);
+  const rentang = (maks - min) || 1;
+  const x = i => pad + (i/(deret.length-1))*(w - pad*2);
+  const y = v => (h - pad) - ((v - min)/rentang)*(h - pad*2);
+  const jalur = deret.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const px = x(posisi).toFixed(1), py = y(deret[posisi]).toFixed(1);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">
+    <path d="${jalur}" fill="none" stroke="var(--gray-400)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${px}" cy="${py}" r="2.6" fill="var(--accent)"/>
+  </svg>`;
+}
+
 function branchRowHtml(b){
   return `
   <tr class="branch-row">
     <td class="cell-name"><div class="bname">${esc(b.name)}</div><div class="addr">${esc(b.addr)}</div></td>
     <td class="num" data-label="Transaksi hari ini"><span class="cell-val"><span class="tx-val">${b.tx} transaksi</span>${deltaHtml(b)}</span></td>
+    <td data-label="Tren"><span class="cell-val">${sparkline(b.deret, b.deretPos)}</span></td>
     <td class="num" data-label="Estimasi omzet"><span class="cell-val">${esc(b.omzet)}</span></td>
     <td data-label="Status"><span class="cell-val"><span class="status ok"><span class="dot"></span>Buka</span></span></td>
     <td class="cell-tools">
@@ -892,7 +937,7 @@ function branchFormRow(b){
   const tx = b ? b.tx : 0;
   const omzet = b ? b.omzet : '';
   return `
-  <tr><td colspan="5">
+  <tr><td colspan="6">
     <div class="row-form">
       <div><label class="field-label">Nama cabang</label><input class="field-input" id="b-name-${id}" value="${esc(name)}"></div>
       <div><label class="field-label">Alamat</label><input class="field-input" id="b-addr-${id}" value="${esc(addr)}"></div>
@@ -908,7 +953,7 @@ function branchFormRow(b){
 
 function branchConfirmRow(b){
   return `
-  <tr><td colspan="5">
+  <tr><td colspan="6">
     <div class="confirm-del">
       <div class="msg">Hapus cabang <b>${esc(b.name)}</b>?</div>
       <div class="row">
@@ -939,6 +984,8 @@ function renderBranches(){
   if(addBtn) addBtn.style.display = (currentRole==='admin' && !branchEditId) ? 'inline-block' : 'none';
   updateRetailSourceTag();
   renderSheetStatus();
+  renderRingkasSumber();
+  renderPilihTanggal();
   renderBacaan();
   renderRiwayat();
   renderAttention();
@@ -985,6 +1032,9 @@ let importedFrom = null; // nama file yang sedang dipakai
 
 let sheetConn = null; // {url, map, lastFetch}
 let riwayat = [];     // [{label, kunci, tx, omzet, buyback}] per tanggal
+let barisSumber = 0;  // jumlah baris mentah dari sumber, untuk keterangan
+let seriesCabang = {};// nama cabang -> daftar catatan harian, urut tanggal
+let tanggalIdx = -1;  // tanggal yang sedang ditampilkan
 let renderBacaanKe = 0; // penanda supaya jawaban lama tidak menimpa tampilan baru
 
 function openImport(){
@@ -1257,25 +1307,10 @@ function applyImport(){
     });
   });
 
-  const hasil = Object.keys(perCabang).map(nama=>{
-    const catatan = perCabang[nama];
-    if(mTgl > -1) catatan.sort((a,b)=> tanggalKunci(a.tgl) - tanggalKunci(b.tgl));
-    const terakhir = catatan[catatan.length-1];
-    const sebelum = catatan.length > 1 ? catatan[catatan.length-2] : null;
-    return {
-      id: 'b'+(branchSeq++),
-      name: nama,
-      addr: mTgl > -1 && terakhir.tgl ? 'Data per ' + terakhir.tgl : 'Dari file impor',
-      tx: terakhir.tx,
-      txPrev: sebelum ? sebelum.tx : terakhir.tx,
-      omzet: terakhir.omzet !== null ? formatRupiah(terakhir.omzet) : 'Tidak diisi',
-      omzetNum: terakhir.omzet,
-      buyback: terakhir.buyback,
-      buybackPrev: sebelum ? sebelum.buyback : null,
-      catatan: terakhir.catatan,
-      tgl: terakhir.tgl
-    };
+  Object.keys(perCabang).forEach(nama=>{
+    if(mTgl > -1) perCabang[nama].sort((a,b)=> tanggalKunci(a.tgl) - tanggalKunci(b.tgl));
   });
+  const adaCabang = Object.keys(perCabang).length > 0;
 
   // kumpulkan riwayat per tanggal untuk grafik
   riwayat = [];
@@ -1293,14 +1328,15 @@ function applyImport(){
     riwayat = Object.values(perTgl).sort((a,b)=>a.kunci-b.kunci);
   }
 
-  if(!hasil.length){
+  if(!adaCabang){
     document.getElementById('importPanel').innerHTML =
       `<div class="import-panel"><div class="import-error">Tidak ada baris yang bisa dipakai. Cek lagi pilihan kolom nama cabang.</div></div>`;
     return;
   }
 
-  branches.length = 0;
-  hasil.forEach(b=>branches.push(b));
+  seriesCabang = perCabang;
+  tanggalIdx = riwayat.length ? riwayat.length - 1 : -1;
+  barisSumber = rows.length;
   importedFrom = importData.fileName;
   if(importData.source === 'sheet'){
     sheetConn = {url: importData.url, map: {...importMap}, lastFetch: nowLabel()};
@@ -1308,6 +1344,36 @@ function applyImport(){
   importData = null; importMap = null;
   document.getElementById('importPanel').innerHTML = '';
   renderSheetStatus();
+  terapkanTanggal(tanggalIdx);
+}
+
+// susun ulang isi tabel sesuai tanggal yang dipilih
+function terapkanTanggal(idx){
+  tanggalIdx = idx;
+  const label = (idx > -1 && riwayat[idx]) ? riwayat[idx].label : null;
+  branches.length = 0;
+  Object.keys(seriesCabang).forEach(nama=>{
+    const rec = seriesCabang[nama];
+    const pos = label ? rec.findIndex(r=>r.tgl===label) : rec.length-1;
+    if(pos < 0) return;                       // cabang tidak punya baris di tanggal itu
+    const kini = rec[pos];
+    const sebelum = pos > 0 ? rec[pos-1] : null;
+    branches.push({
+      id: 'b'+(branchSeq++),
+      name: nama,
+      addr: kini.tgl ? 'Data per ' + kini.tgl : 'Dari sumber impor',
+      tx: kini.tx,
+      txPrev: sebelum ? sebelum.tx : kini.tx,
+      omzet: kini.omzet !== null ? formatRupiah(kini.omzet) : 'Tidak diisi',
+      omzetNum: kini.omzet,
+      buyback: kini.buyback,
+      buybackPrev: sebelum ? sebelum.buyback : null,
+      catatan: kini.catatan,
+      tgl: kini.tgl,
+      deret: rec.map(r=>r.tx),
+      deretPos: pos
+    });
+  });
   renderBranches();
 }
 
@@ -1317,9 +1383,45 @@ function resetImport(){
   importedFrom = null;
   sheetConn = null;   // balik ke data contoh berarti lepas dari semua sumber luar
   riwayat = [];
+  barisSumber = 0;
+  seriesCabang = {};
+  tanggalIdx = -1;
   document.getElementById('importPanel').innerHTML = '';
   renderSheetStatus();
   renderBranches();
+}
+
+function renderPilihTanggal(){
+  if(!appReady) return;
+  const box = document.getElementById('pilihTanggal');
+  if(!box) return;
+  if(riwayat.length < 2){ box.innerHTML = ''; return; }
+  const pilihan = riwayat.map((d,i)=>
+    `<option value="${i}" ${i===tanggalIdx?'selected':''}>${esc(d.label)}${i===riwayat.length-1?' (terbaru)':''}</option>`
+  ).join('');
+  box.innerHTML = `
+  <div class="pilih-tanggal">
+    <label for="tglSelect">Tampilkan tanggal</label>
+    <select id="tglSelect" onchange="terapkanTanggal(parseInt(this.value,10))">${pilihan}</select>
+    <span class="pilih-hint">Bisa juga klik batang di grafik riwayat</span>
+  </div>`;
+}
+
+function renderRingkasSumber(){
+  if(!appReady) return;
+  const el = document.getElementById('ringkasSumber');
+  if(!el) return;
+  if(!barisSumber){ el.textContent = ''; return; }
+  const tglTerakhir = riwayat.length ? riwayat[riwayat.length-1].label : null;
+  let teks = `${barisSumber} baris terbaca, dikelompokkan jadi ${branches.length} cabang`;
+  if(riwayat.length > 1){
+    teks += ` dari ${riwayat.length} tanggal. Tabel di bawah menampilkan kondisi ${tglTerakhir}, tanggal sebelumnya dipakai untuk perbandingan dan grafik.`;
+  } else if(tglTerakhir){
+    teks += `. Semua baris bertanggal ${tglTerakhir}.`;
+  } else {
+    teks += '. Sumber tidak punya kolom tanggal, jadi semua baris dianggap satu periode.';
+  }
+  el.textContent = teks;
 }
 
 function updateRetailSourceTag(){
@@ -1500,12 +1602,17 @@ function grafikBatang(data, w, h){
     const tinggi = (d.tx/maks)*ih;
     const x = padL + i*lebar + (lebar-batang)/2;
     const y = padT + ih - tinggi;
-    const akhir = i === data.length-1;
-    return `<rect x="${x}" y="${y}" width="${batang}" height="${Math.max(tinggi,1)}" rx="3"
-              fill="${akhir ? 'var(--accent)' : 'var(--gray-200)'}"><title>${esc(d.label)}: ${d.tx} transaksi</title></rect>
-            <text x="${x+batang/2}" y="${y-6}" text-anchor="middle" font-size="11" font-weight="700"
-              fill="${akhir ? 'var(--accent-dim)' : 'var(--gray-500)'}">${d.tx}</text>
-            <text x="${x+batang/2}" y="${h-7}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${esc(d.label.slice(0,5))}</text>`;
+    const terpilih = i === tanggalIdx;
+    return `<g class="bar-grup" onclick="terapkanTanggal(${i})" style="cursor:pointer;">
+              <rect x="${padL + i*lebar}" y="${padT}" width="${lebar}" height="${ih}" fill="transparent"></rect>
+              <rect class="bar" x="${x}" y="${y}" width="${batang}" height="${Math.max(tinggi,1)}" rx="3"
+                style="animation-delay:${i*70}ms"
+                fill="${terpilih ? 'var(--accent)' : 'var(--gray-200)'}"><title>${esc(d.label)}: ${d.tx} transaksi. Klik untuk menampilkan tanggal ini</title></rect>
+              <text x="${x+batang/2}" y="${y-6}" text-anchor="middle" font-size="11" font-weight="700"
+                fill="${terpilih ? 'var(--accent-dim)' : 'var(--gray-500)'}">${d.tx}</text>
+              <text x="${x+batang/2}" y="${h-7}" text-anchor="middle" font-size="9"
+                font-weight="${terpilih?'700':'400'}" fill="${terpilih ? 'var(--black)' : 'var(--gray-400)'}">${esc(d.label.slice(0,5))}</text>
+            </g>`;
   }).join('');
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img">${garis}${isi}</svg>`;
 }
@@ -1532,8 +1639,8 @@ function grafikPorsi(data, w, h){
   const label = data.map((d,i)=>`<text x="${x(i).toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${esc(d.label.slice(0,5))}</text>`).join('');
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img">
     ${garis}
-    <path d="${area}" fill="var(--accent)" opacity="0.08"/>
-    <path d="${jalur}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    <path class="area" d="${area}" fill="var(--accent)" opacity="0.08"/>
+    <path class="garis" d="${jalur}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
     ${titik}${label}
   </svg>`;
 }
