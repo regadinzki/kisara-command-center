@@ -282,14 +282,31 @@
     .price-strip{grid-template-columns:1fr;}
     .price-cell{border-right:none; border-bottom:1px solid var(--line);}
     .price-cell:last-child{border-bottom:none;}
-    .branch-table{min-width:560px;}
+    /* Tabel cabang jadi kartu di layar HP */
+    .table-scroll{overflow-x:visible;}
+    .branch-table{min-width:0; margin-top:14px;}
+    .branch-table thead{display:none;}
+    .branch-table tbody, .branch-table tr, .branch-table td{display:block; width:100%;}
+    .branch-table tr.branch-row{
+      border:1px solid var(--line); border-radius:var(--radius); padding:16px 16px 10px;
+      margin-bottom:12px; position:relative;
+    }
+    .branch-table tr.branch-row td{border-bottom:none; padding:0;}
+    .branch-table tr.branch-row td.cell-name{padding-right:70px; margin-bottom:12px;}
+    .branch-table tr.branch-row td[data-label]{
+      display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+      padding:9px 0; border-top:1px solid var(--gray-100);
+    }
+    .branch-table tr.branch-row td[data-label]::before{
+      content:attr(data-label); font-size:11.5px; color:var(--gray-500); font-weight:500; flex:none;
+    }
+    .branch-table tr.branch-row td.cell-tools{position:absolute; top:14px; right:14px; width:auto; padding:0;}
+    .branch-table tr.branch-row td[data-label] .cell-val{text-align:right;}
     .row-form{grid-template-columns:1fr;}
     footer{padding:18px 16px; flex-direction:column; align-items:flex-start;}
-    .comp-card{flex-direction:column; align-items:flex-start; gap:12px; padding-right:18px;}
+    .comp-card{flex-direction:column; align-items:flex-start; gap:12px; padding-right:80px;}
     .comp-right{text-align:left;}
-    .card-tools{position:static; margin-top:12px;}
-    .unit-card .top{padding-right:0;}
-    .req-top{padding-right:18px;}
+    .delta{display:block; margin-left:0; margin-top:3px;}
   }
 
   /* ---------- LOGIN GATE ---------- */
@@ -744,12 +761,12 @@ function deltaHtml(b){
 
 function branchRowHtml(b){
   return `
-  <tr>
-    <td><div class="bname">${esc(b.name)}</div><div class="addr">${esc(b.addr)}</div></td>
-    <td class="num">${b.tx} transaksi${deltaHtml(b)}</td>
-    <td class="num">${esc(b.omzet)}</td>
-    <td><span class="status ok"><span class="dot"></span>Buka</span></td>
-    <td>
+  <tr class="branch-row">
+    <td class="cell-name"><div class="bname">${esc(b.name)}</div><div class="addr">${esc(b.addr)}</div></td>
+    <td class="num" data-label="Transaksi hari ini"><span class="cell-val">${b.tx} transaksi${deltaHtml(b)}</span></td>
+    <td class="num" data-label="Estimasi omzet"><span class="cell-val">${esc(b.omzet)}</span></td>
+    <td data-label="Status"><span class="cell-val"><span class="status ok"><span class="dot"></span>Buka</span></span></td>
+    <td class="cell-tools">
       <div class="rowtools">
         <button class="edit-btn" title="Edit cabang" onclick="branchStartEdit('${b.id}')">&#9998;</button>
         <button class="del-btn" title="Hapus cabang" onclick="branchStartDelete('${b.id}')">&times;</button>
