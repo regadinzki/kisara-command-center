@@ -156,7 +156,8 @@
     border:1px dashed var(--gray-200); border-radius:var(--radius); padding:18px;
     margin-top:16px; font-size:12.5px; color:var(--gray-400); text-align:center;
   }
-  .delta{font-size:12px; font-weight:700; margin-left:10px; display:inline-flex; align-items:center; gap:3px; cursor:default;}
+  .tx-val{display:inline-block; min-width:96px;}
+  .delta{font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:3px; cursor:default;}
   .delta .arrow{font-size:8.5px; line-height:1;}
   .delta.up{color:var(--ok);}
   .delta.down{color:var(--danger);}
@@ -194,6 +195,10 @@
   .sim-tag{
     font-size:11px; color:var(--accent-dim); background:var(--warn-bg); border:1px solid #f0dfb8;
     padding:5px 10px; border-radius:8px; white-space:nowrap; font-weight:600;
+  }
+  .src-note{
+    font-size:11px; color:var(--ok); background:var(--ok-bg); border:1px solid #cbe8d5;
+    padding:5px 10px; border-radius:8px; font-weight:600; display:inline-block;
   }
 
   .grid{display:grid; gap:14px; margin-top:22px;}
@@ -307,7 +312,7 @@
   .comp-right .days small{font-size:11px; color:var(--gray-500); font-weight:500;}
 
   /* APPROVAL */
-  .req-card{padding:0; overflow:hidden;}
+  .req-card{padding:0; overflow:hidden; display:flex; flex-direction:column;}
   .req-top{padding:16px 80px 16px 18px;}
   .req-title{font-size:14.5px; font-weight:700;}
   .req-entity{font-size:11px; color:var(--accent-dim); margin-top:4px; text-transform:uppercase; letter-spacing:.03em;}
@@ -324,7 +329,7 @@
   .chain-label{font-size:10.5px; color:var(--gray-500); margin-top:6px; text-align:center;}
   .chain-line{height:2px; background:var(--gray-200); flex:1 1 0; margin-top:12px;}
   .chain-line.done{background:var(--ok);}
-  .req-actions{border-top:1px solid var(--line); padding:12px 18px; display:flex; justify-content:space-between; align-items:center; background:var(--gray-50); flex-wrap:wrap; gap:8px;}
+  .req-actions{border-top:1px solid var(--line); padding:12px 18px; display:flex; justify-content:space-between; align-items:center; background:var(--gray-50); flex-wrap:wrap; gap:8px; margin-top:auto; min-height:53px;}
   .req-status-txt{font-size:12px; color:var(--gray-500);}
   .req-form, .req-confirm{padding:18px;}
 
@@ -523,7 +528,7 @@
       <button class="btn admin-add" id="branchAddBtn" onclick="branchStartAdd()">+ Tambah cabang</button>
       <button class="btn primary admin-add" id="sheetBtn" onclick="openSheetForm()">Sambungkan Google Sheet</button>
       <button class="btn admin-add" id="importBtn" onclick="openImport()">Impor file</button>
-      <button class="btn admin-add" id="importResetBtn" onclick="resetImport()" style="display:none;">Kembali ke data contoh</button>
+      <button class="btn admin-add" id="importResetBtn" onclick="resetImport()" style="display:none;">Kembali ke data simulasi</button>
       <input type="file" id="importFile" accept=".csv,.tsv,.txt" style="display:none;" onchange="handleImportFile(this)">
     </div>
 
@@ -846,7 +851,7 @@ function branchRowHtml(b){
   return `
   <tr class="branch-row">
     <td class="cell-name"><div class="bname">${esc(b.name)}</div><div class="addr">${esc(b.addr)}</div></td>
-    <td class="num" data-label="Transaksi hari ini"><span class="cell-val">${b.tx} transaksi${deltaHtml(b)}</span></td>
+    <td class="num" data-label="Transaksi hari ini"><span class="cell-val"><span class="tx-val">${b.tx} transaksi</span>${deltaHtml(b)}</span></td>
     <td class="num" data-label="Estimasi omzet"><span class="cell-val">${esc(b.omzet)}</span></td>
     <td data-label="Status"><span class="cell-val"><span class="status ok"><span class="dot"></span>Buka</span></span></td>
     <td class="cell-tools">
@@ -994,7 +999,7 @@ function openSheetForm(){
     </ol>
     <div id="sheetError"></div>
     <div class="edit-actions" style="margin-top:16px;">
-      <button class="btn primary" onclick="fetchSheet()">Tarik data</button>
+      <button class="btn primary" onclick="fetchSheet()">Hubungkan</button>
       <button class="btn" onclick="cancelImport()">Batal</button>
     </div>
   </div>`;
@@ -1008,7 +1013,7 @@ async function fetchSheet(){
     if(err) err.innerHTML = `<div class="import-error">Alamat tidak dikenali. Pastikan itu alamat Google Sheet.</div>`;
     return;
   }
-  if(err) err.innerHTML = `<div class="import-file">Menarik data...</div>`;
+  if(err) err.innerHTML = `<div class="import-file">Menghubungkan...</div>`;
   try{
     const res = await fetch(url);
     if(!res.ok) throw new Error('status ' + res.status);
@@ -1041,7 +1046,6 @@ async function refreshSheet(){
 }
 
 function disconnectSheet(){
-  sheetConn = null;
   resetImport();
 }
 
@@ -1054,11 +1058,11 @@ function renderSheetStatus(){
   <div class="sheet-live">
     <div>
       <div class="info">Tersambung ke Google Sheet</div>
-      <div class="sub">Data ditarik langsung dari sheet. Terakhir ${sheetConn.lastFetch}</div>
+      <div class="sub">Angka di tabel ini dibaca langsung dari sheet. Terakhir diperbarui ${sheetConn.lastFetch}</div>
     </div>
     <div class="acts">
-      <button class="btn" onclick="refreshSheet()">Tarik ulang</button>
-      <button class="btn" onclick="disconnectSheet()">Putuskan</button>
+      <button class="btn" onclick="refreshSheet()">Perbarui data</button>
+      <button class="btn" onclick="disconnectSheet()">Putuskan koneksi</button>
     </div>
   </div>`;
 }
@@ -1176,7 +1180,7 @@ function renderImportPanel(){
     </div>
     ${!siap ? `<div class="import-error">Pilih dulu kolom nama cabang dan jumlah transaksi.</div>` : ''}
     <div class="edit-actions" style="margin-top:18px;">
-      <button class="btn primary" ${siap?'':'disabled style="opacity:.45; cursor:not-allowed;"'} onclick="${siap?'applyImport()':''}">Pakai data ini</button>
+      <button class="btn primary" ${siap?'':'disabled style="opacity:.45; cursor:not-allowed;"'} onclick="${siap?'applyImport()':''}">Gunakan data ini</button>
       <button class="btn" onclick="cancelImport()">Batal</button>
     </div>
   </div>`;
@@ -1288,6 +1292,7 @@ function resetImport(){
   branches.length = 0;
   branchesDemo.forEach(b=>branches.push({...b}));
   importedFrom = null;
+  sheetConn = null;   // balik ke data contoh berarti lepas dari semua sumber luar
   riwayat = [];
   document.getElementById('importPanel').innerHTML = '';
   renderSheetStatus();
@@ -1299,13 +1304,28 @@ function updateRetailSourceTag(){
   const tag = document.getElementById('retailSourceTag');
   const resetBtn = document.getElementById('importResetBtn');
   if(tag){
-    tag.textContent = sheetConn
-      ? 'Angka di bawah ditarik langsung dari Google Sheet, bukan data simulasi'
-      : importedFrom
-        ? `Angka di bawah dari file ${importedFrom}, bukan data simulasi`
-        : 'Kolom transaksi dan omzet: data simulasi, bukan angka asli';
+    if(sheetConn){
+      // kotak hijau di bawah sudah menjelaskan sumbernya, tidak perlu diulang
+      tag.style.display = 'none';
+      tag.className = '';
+    } else if(importedFrom){
+      tag.style.display = '';
+      tag.className = 'src-note';
+      tag.textContent = `Angka di bawah dari file ${importedFrom}, bukan data simulasi`;
+    } else {
+      tag.style.display = '';
+      tag.className = 'sim-tag';
+      tag.textContent = 'Kolom transaksi dan omzet: data simulasi, bukan angka asli';
+    }
   }
-  if(resetBtn) resetBtn.style.display = (importedFrom && currentRole==='admin') ? 'inline-block' : 'none';
+  // kalau tersambung ke sheet, tombol lepas sambungan di kotak hijau sudah cukup
+  if(resetBtn) resetBtn.style.display = (importedFrom && !sheetConn && currentRole==='admin') ? 'inline-block' : 'none';
+  const sheetBtn = document.getElementById('sheetBtn');
+  if(sheetBtn){
+    // tombol berhenti menonjol begitu sumbernya sudah tersambung
+    sheetBtn.className = sheetConn ? 'btn admin-add' : 'btn primary admin-add';
+    sheetBtn.textContent = sheetConn ? 'Ganti sheet' : 'Sambungkan Google Sheet';
+  }
 }
 
 /* =========================================================
@@ -1385,7 +1405,7 @@ function renderBacaan(){
 
   const punyaData = sheetConn || importedFrom;
   if(!punyaData){
-    box.innerHTML = `<div class="bacaan-kosong">Sambungkan Google Sheet atau impor file untuk melihat pembacaan otomatis.</div>`;
+    box.innerHTML = `<div class="bacaan-kosong">Sambungkan Google Sheet atau impor file untuk melihat analisa otomatis.</div>`;
     return;
   }
 
@@ -1393,7 +1413,7 @@ function renderBacaan(){
   box.innerHTML = `
   <div class="bacaan">
     <div class="bacaan-head">
-      <span class="bacaan-title">Pembacaan otomatis</span>
+      <span class="bacaan-title">Analisa otomatis</span>
       <span class="bacaan-note">Disusun dari angka dan catatan di sumber data, bukan tebakan</span>
     </div>
     <ul class="bacaan-list">
@@ -1417,7 +1437,7 @@ function grafikBatang(data, w, h){
   const iw = w - padL - padR, ih = h - padB - padT;
   const maks = Math.max(...data.map(d=>d.tx), 1);
   const lebar = iw / data.length;
-  const batang = lebar * 0.52;
+  const batang = Math.min(lebar * 0.6, 64);
   const garis = [0, Math.round(maks/2), maks].map(v=>{
     const y = padT + ih - (v/maks)*ih;
     return `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="var(--gray-100)" stroke-width="1"/>
@@ -1492,13 +1512,13 @@ function renderRiwayat(){
       <div class="chart-box">
         <div class="chart-title">Transaksi seluruh cabang</div>
         <div class="chart-sub">${total.tx} transaksi hari terakhir, ${bedaTx>=0?'naik':'turun'} ${Math.abs(bedaTx)} dibanding hari pertama</div>
-        ${grafikBatang(riwayat, 340, 150)}
+        ${grafikBatang(riwayat, 520, 170)}
       </div>
       ${adaUang ? `
       <div class="chart-box">
         <div class="chart-title">Porsi buyback terhadap penjualan</div>
         <div class="chart-sub">Penjualan hari terakhir Rp${ringkasRupiah(total.omzet)}, buyback Rp${ringkasRupiah(total.buyback)}. Makin tinggi porsinya, makin banyak orang mencairkan emas.</div>
-        ${grafikPorsi(riwayat, 340, 150)}
+        ${grafikPorsi(riwayat, 520, 170)}
       </div>` : ''}
     </div>
   </div>`;
@@ -1719,7 +1739,7 @@ function reqConfirmHtml(r){
     <div class="confirm-del req-confirm">
       <div class="msg">Tarik request <b>${esc(r.title)}</b>?</div>
       <div class="row">
-        <button class="btn danger" onclick="reqConfirmDelete('${r.id}')">Ya, tarik</button>
+        <button class="btn danger" onclick="reqConfirmDelete('${r.id}')">Ya, tarik request</button>
         <button class="btn" onclick="reqCancelDelete()">Batal</button>
       </div>
     </div>
