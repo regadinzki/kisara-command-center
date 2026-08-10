@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kisara Group Command Center</title>
+<style>
+  :root{
+    --black:#0A0A0A;
+    --white:#FFFFFF;
+    --gray-50:#F7F7F5;
+    --gray-100:#F0F0EE;
+    --gray-200:#E4E4E1;
+    --gray-400:#A3A39C;
+    --gray-500:#7A7A73;
+    --gray-700:#3D3D38;
+    --line:#E4E4E1;
+    --accent:#B8860B;
+    --accent-dim:#8a6608;
+    --ok:#16A34A;
+    --ok-bg:#EAF7EE;
+    --warn:#D97706;
+    --warn-bg:#FDF3E5;
+    --danger:#DC2626;
+    --danger-bg:#FCEAEA;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Inter","Helvetica Neue",Arial,sans-serif;
+    background:var(--white);
+    color:var(--black);
+    -webkit-font-smoothing:antialiased;
+    letter-spacing:-0.01em;
+  }
+  a{color:inherit; text-decoration:none;}
+
+  /* ---------- HERO ---------- */
+  .hero{background:var(--black); color:var(--white); padding:56px 48px 40px; position:relative; overflow:hidden;}
+  .hero::before{
+    content:""; position:absolute; inset:0;
+    background:radial-gradient(circle at 85% -10%, rgba(184,134,11,0.25), transparent 55%);
+    pointer-events:none;
+  }
+  .topline{display:flex; align-items:center; justify-content:space-between; position:relative; z-index:1; flex-wrap:wrap; gap:12px;}
+  .wordmark{font-size:15px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;}
+  .wordmark span{color:var(--accent);}
+  .tagline{font-size:11px; color:var(--gray-400); margin-top:2px; letter-spacing:0.02em;}
+  .mode-pill{
+    display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.14); padding:8px 14px; border-radius:999px; font-size:12px; color:var(--gray-400);
+  }
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--accent); flex:none;}
+  .hero-h1{font-size:clamp(32px,4.4vw,52px); font-weight:700; line-height:1.05; margin-top:34px; letter-spacing:-0.02em; position:relative; z-index:1;}
+  .hero-sub{max-width:580px; margin-top:14px; color:var(--gray-400); font-size:14.5px; line-height:1.55; position:relative; z-index:1;}
+
+  .kpi-row{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(255,255,255,0.1);
+    margin-top:36px; border-radius:10px; overflow:hidden; position:relative; z-index:1;
+  }
+  .kpi{background:#141414; padding:18px 20px;}
+  .kpi .num{font-size:26px; font-weight:700;}
+  .kpi .lbl{font-size:11.5px; color:var(--gray-400); margin-top:4px;}
+
+  /* ---------- NAV ---------- */
+  .tabs{
+    display:flex; gap:4px; padding:0 48px; border-bottom:1px solid var(--line);
+    background:var(--white); position:sticky; top:0; z-index:5;
+  }
+  .tab{
+    padding:16px 18px; font-size:13.5px; font-weight:600; color:var(--gray-500);
+    border-bottom:2px solid transparent; cursor:pointer; display:flex; align-items:center; gap:8px; transition:.15s;
+  }
+  .tab:hover{color:var(--black);}
+  .tab.active{color:var(--black); border-bottom-color:var(--accent);}
+  .tab .badge{font-size:10.5px; background:var(--gray-100); color:var(--gray-500); padding:1px 7px; border-radius:999px; font-weight:700;}
+  .tab.active .badge{background:var(--black); color:var(--white);}
+
+  /* ---------- CONTENT ---------- */
+  .content{padding:32px 48px 64px; max-width:1180px;}
+  .panel{display:none; animation:fade .25s ease;}
+  .panel.active{display:block;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  .panel-head{display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:12px;}
+  .panel-title{font-size:22px; font-weight:700; letter-spacing:-0.01em;}
+  .panel-desc{font-size:13px; color:var(--gray-500); margin-top:4px; max-width:640px; line-height:1.5;}
+  .source-tag{
+    font-size:11px; color:var(--gray-500); background:var(--gray-50); border:1px solid var(--line);
+    padding:5px 10px; border-radius:8px; white-space:nowrap;
+  }
+  .source-tag b{color:var(--black);}
+  .sim-tag{
+    font-size:11px; color:var(--accent-dim); background:var(--warn-bg); border:1px solid #f0dfb8;
+    padding:5px 10px; border-radius:8px; white-space:nowrap; font-weight:600;
+  }
+
+  .grid{display:grid; gap:14px; margin-top:22px;}
+  .grid.cols-4{grid-template-columns:repeat(4,1fr);}
+  .grid.cols-2{grid-template-columns:repeat(2,1fr);}
+
+  .card{border:1px solid var(--line); border-radius:var(--radius); padding:18px; background:var(--white); transition:.15s; position:relative;}
+  .card:hover{border-color:#cfcfc9; box-shadow:0 2px 14px rgba(0,0,0,0.04);}
+
+  .status{display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; padding:4px 9px; border-radius:999px;}
+  .status.ok{background:var(--ok-bg); color:var(--ok);}
+  .status.warn{background:var(--warn-bg); color:var(--warn);}
+  .status.danger{background:var(--danger-bg); color:var(--danger);}
+  .status .dot{background:currentColor; width:6px; height:6px;}
+
+  /* admin-only controls */
+  .edit-btn, .del-btn, .admin-add{display:none;}
+  body.role-admin .edit-btn, body.role-admin .del-btn{
+    display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%;
+    border:1px solid var(--line); background:var(--white); cursor:pointer; flex:none; color:var(--gray-500); font-size:12px; transition:.15s;
+  }
+  body.role-admin .edit-btn:hover{border-color:var(--accent); color:var(--accent-dim);}
+  body.role-admin .del-btn:hover{border-color:var(--danger); color:var(--danger);}
+  body.role-admin .admin-add{display:inline-block; margin-top:16px;}
+  .card-tools{position:absolute; top:14px; right:14px; display:flex; gap:6px;}
+
+  .sim-day-row{display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap;}
+  .sim-day-label{font-size:11.5px; color:var(--gray-500);}
+  .sim-day-label b{color:var(--black);}
+
+  /* inline edit form + inline confirm */
+  .edit-form{display:flex; flex-direction:column; gap:10px;}
+  .field-label{font-size:11px; color:var(--gray-500); margin-bottom:4px; display:block;}
+  .field-input{
+    width:100%; border:1px solid var(--line); border-radius:8px; padding:8px 10px;
+    font-size:13px; font-family:inherit; color:var(--black); background:var(--white);
+  }
+  .field-input:focus{outline:none; border-color:var(--accent);}
+  .edit-actions{display:flex; gap:8px; margin-top:2px;}
+  .confirm-del{display:flex; flex-direction:column; gap:12px; align-items:flex-start; padding:6px 0;}
+  .confirm-del .msg{font-size:13px; color:var(--gray-700);}
+  .confirm-del .row{display:flex; gap:8px;}
+  .btn{
+    font-size:11.5px; font-weight:600; padding:7px 11px; border-radius:8px; border:1px solid var(--line);
+    background:var(--white); cursor:pointer; transition:.15s; color:var(--black);
+  }
+  .btn:hover{background:var(--gray-50); border-color:#cfcfc9;}
+  .btn.primary{background:var(--black); color:var(--white); border-color:var(--black);}
+  .btn.primary:hover{background:#222;}
+  .btn.reject{color:var(--danger);}
+  .btn.danger{background:var(--danger); color:var(--white); border-color:var(--danger);}
+  .btn.danger:hover{background:#b91c1c;}
+
+  /* FLEET */
+  .unit-card .top{padding-right:80px;}
+  .unit-card h4{font-size:15.5px; font-weight:700;}
+  .unit-card .type{font-size:12px; color:var(--gray-500); margin-top:2px;}
+  .unit-card .status{margin-top:10px;}
+  .unit-card .src-tag{font-size:11px; color:var(--gray-400); margin-top:8px;}
+  .unit-card .ratio{font-size:24px; font-weight:700; margin-top:14px; min-height:29px; display:flex; align-items:center;}
+  .unit-card .ratio.empty{font-size:15px; font-weight:600; color:var(--gray-500);}
+  .quick-actions{display:none; flex-direction:column; gap:6px; margin-top:14px;}
+  body.role-admin .quick-actions{display:flex;}
+  .qbtn{width:100%; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--white); color:var(--gray-500); font-size:11.5px; font-weight:600; cursor:pointer; text-align:center; transition:.15s;}
+  .qbtn:hover{border-color:var(--gray-400);}
+  .qbtn.on-active{background:var(--ok-bg); border-color:var(--ok); color:var(--ok);}
+  .qbtn.on-warn{background:var(--warn-bg); border-color:var(--warn); color:var(--warn);}
+  .qbtn-placeholder{display:none; margin-top:14px; padding:10px; border:1px dashed var(--gray-200); border-radius:8px; font-size:11px; color:var(--gray-400); text-align:center; line-height:1.6;}
+  body.role-admin .qbtn-placeholder{display:block;}
+  .unit-card .ratio small{font-size:12px; font-weight:500; color:var(--gray-500);}
+  .bar-track{height:6px; background:var(--gray-100); border-radius:99px; margin-top:10px; overflow:hidden;}
+  .bar-fill{height:100%; background:var(--accent); border-radius:99px; transition:width .3s;}
+  .log{margin-top:26px; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
+  .log-head{padding:12px 16px; border-bottom:1px solid var(--line); font-size:12.5px; font-weight:700; background:var(--gray-50);}
+  .log-item{padding:11px 16px; border-bottom:1px solid var(--line); font-size:12.5px; display:flex; justify-content:space-between; gap:10px; color:var(--gray-700);}
+  .log-item:last-child{border-bottom:none;}
+  .log-item .t{color:var(--gray-400); white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .log-empty{padding:20px 16px; font-size:12.5px; color:var(--gray-400); text-align:center;}
+
+  /* RETAIL */
+  .price-strip{
+    display:grid; grid-template-columns:1fr 1fr auto; gap:0; border:1px solid var(--line); border-radius:var(--radius);
+    overflow:hidden; margin-top:20px;
+  }
+  .price-cell{padding:18px 22px; border-right:1px solid var(--line);}
+  .price-cell:last-child{border-right:none; display:flex; align-items:center; background:var(--gray-50);}
+  .price-cell .lbl{font-size:11px; color:var(--gray-500); text-transform:uppercase; letter-spacing:.04em;}
+  .price-cell .val{font-size:22px; font-weight:700; margin-top:6px;}
+  .price-cell .meta{font-size:11px; color:var(--gray-400); margin-top:4px;}
+
+  .table-scroll{overflow-x:auto;}
+  .branch-table{width:100%; border-collapse:collapse; margin-top:18px; font-size:13px;}
+  .branch-table th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--gray-500);
+    padding:10px 14px; border-bottom:1px solid var(--line); font-weight:700;
+  }
+  .branch-table td{padding:13px 14px; border-bottom:1px solid var(--line); vertical-align:top;}
+  .branch-table tr:last-child td{border-bottom:none;}
+  .branch-table .bname{font-weight:700;}
+  .branch-table .addr{color:var(--gray-500); font-size:12px; margin-top:2px;}
+  .branch-table .num{font-variant-numeric:tabular-nums; font-weight:600;}
+  .branch-table .rowtools{display:flex; gap:6px;}
+  .row-form{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding:6px 0;}
+
+  /* COMPLIANCE */
+  .comp-card{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding-right:80px;}
+  .comp-right{padding-top:1px;}
+  .comp-left h4{font-size:14.5px; font-weight:700;}
+  .comp-left .sub{font-size:12px; color:var(--gray-500); margin-top:3px;}
+  .comp-left .entity{font-size:11px; color:var(--accent-dim); margin-top:6px; text-transform:uppercase; letter-spacing:.03em;}
+  .comp-right{text-align:right; min-width:100px;}
+  .comp-right .days{font-size:22px; font-weight:700;}
+  .comp-right .days small{font-size:11px; color:var(--gray-500); font-weight:500;}
+
+  /* APPROVAL */
+  .req-card{padding:0; overflow:hidden;}
+  .req-top{padding:16px 80px 16px 18px;}
+  .req-title{font-size:14.5px; font-weight:700;}
+  .req-entity{font-size:11px; color:var(--accent-dim); margin-top:4px; text-transform:uppercase; letter-spacing:.03em;}
+  .req-amt{font-size:16px; font-weight:700; margin-top:10px;}
+  .chain{display:flex; align-items:flex-start; padding:0 18px 16px;}
+  .chain-step{display:flex; flex-direction:column; align-items:center; flex:0 0 64px;}
+  .chain-node{
+    width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; border:2px solid var(--gray-200); color:var(--gray-400); background:var(--white); flex:none;
+  }
+  .chain-node.done{border-color:var(--ok); background:var(--ok); color:var(--white);}
+  .chain-node.pending{border-color:var(--accent); color:var(--accent);}
+  .chain-node.rejected{border-color:var(--danger); background:var(--danger); color:var(--white);}
+  .chain-label{font-size:10.5px; color:var(--gray-500); margin-top:6px; text-align:center;}
+  .chain-line{height:2px; background:var(--gray-200); flex:1 1 0; margin-top:12px;}
+  .chain-line.done{background:var(--ok);}
+  .req-actions{border-top:1px solid var(--line); padding:12px 18px; display:flex; justify-content:space-between; align-items:center; background:var(--gray-50); flex-wrap:wrap; gap:8px;}
+  .req-status-txt{font-size:12px; color:var(--gray-500);}
+  .req-form, .req-confirm{padding:18px;}
+
+  footer{
+    border-top:1px solid var(--line); padding:22px 48px; display:flex; justify-content:space-between;
+    align-items:center; font-size:11.5px; color:var(--gray-400); flex-wrap:wrap; gap:8px;
+  }
+  footer b{color:var(--gray-700);}
+
+  @media (max-width: 900px){
+    .grid.cols-4, .grid.cols-2{grid-template-columns:1fr 1fr;}
+    .kpi-row{grid-template-columns:1fr 1fr;}
+    .content, .hero, .tabs, footer{padding-left:20px; padding-right:20px;}
+  }
+
+  @media (max-width: 620px){
+    .grid.cols-4, .grid.cols-2{grid-template-columns:1fr;}
+    .kpi-row{grid-template-columns:1fr 1fr;}
+    .content, .hero, footer{padding-left:16px; padding-right:16px;}
+    .hero{padding-top:40px; padding-bottom:28px;}
+    .tabs{padding-left:8px; padding-right:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+    .tabs::-webkit-scrollbar{display:none;}
+    .tab{padding:14px 12px; white-space:nowrap; flex:none;}
+    .price-strip{grid-template-columns:1fr;}
+    .price-cell{border-right:none; border-bottom:1px solid var(--line);}
+    .price-cell:last-child{border-bottom:none;}
+    .branch-table{min-width:560px;}
+    .row-form{grid-template-columns:1fr;}
+    footer{padding:18px 16px; flex-direction:column; align-items:flex-start;}
+    .comp-card{flex-direction:column; align-items:flex-start; gap:12px; padding-right:18px;}
+    .comp-right{text-align:left;}
+    .card-tools{position:static; margin-top:12px;}
+    .unit-card .top{padding-right:0;}
+    .req-top{padding-right:18px;}
+  }
+
+  /* ---------- LOGIN GATE ---------- */
+  #loginGate{min-height:100vh; background:var(--black); color:var(--white); display:flex; align-items:center; justify-content:center; padding:24px;}
+  .login-card{width:100%; max-width:360px;}
+  .login-word{font-size:14px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:6px;}
+  .login-word span{color:var(--accent);}
+  .login-title{font-size:22px; font-weight:700; margin-bottom:6px;}
+  .login-sub{font-size:13px; color:var(--gray-400); margin-bottom:28px; line-height:1.5;}
+  .login-field{margin-bottom:14px;}
+  .login-field label{font-size:11.5px; color:var(--gray-400); display:block; margin-bottom:6px;}
+  .login-field input{
+    width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.16);
+    border-radius:9px; padding:11px 13px; color:var(--white); font-size:14px; outline:none;
+  }
+  .login-field input:focus{border-color:var(--accent);}
+  .login-hint{font-size:11px; color:var(--gray-500); margin:14px 0 20px; line-height:1.6; border-top:1px solid rgba(255,255,255,0.1); padding-top:14px;}
+  .login-btn{width:100%; background:var(--white); color:var(--black); border:none; border-radius:9px; padding:12px; font-size:13.5px; font-weight:700; cursor:pointer; transition:.15s;}
+  .login-btn:hover{background:var(--gray-100);}
+
+  .role-pill{font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.03em;}
+  .role-pill.admin{background:var(--ok-bg); color:var(--ok);}
+  .role-pill.viewer{background:var(--gray-100); color:var(--gray-500);}
+  .logout-link{font-size:11.5px; color:var(--gray-400); cursor:pointer; text-decoration:underline; text-underline-offset:2px;}
+  .logout-link:hover{color:var(--white);}
+</style>
+</head>
+<body>
+
+<div id="loginGate">
+  <div class="login-card">
+    <div class="login-word">KISARA <span>GROUP</span></div>
+    <div class="login-title">Masuk ke Command Center</div>
+    <div class="login-sub">Simulasi login untuk menunjukkan konsep akses bertingkat. Bukan sistem otentikasi asli.</div>
+    <div class="login-field">
+      <label>Email</label>
+      <input type="text" id="loginUser" placeholder="nama@kisaracapital.com">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="********">
+    </div>
+    <div class="login-hint">Demo: isi password <b style="color:var(--white)">admin123</b> untuk masuk sebagai <b style="color:var(--white)">Admin</b>, bisa tambah, ubah, dan hapus data. Password lain atau kosong masuk sebagai <b style="color:var(--white)">Viewer</b>, lihat saja.</div>
+    <button class="login-btn" onclick="doLogin()">Masuk</button>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
+<div class="hero">
+  <div class="topline">
+    <div>
+      <div class="wordmark">KISARA <span>GROUP</span></div>
+      <div class="tagline">Command Center, versi konsep</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="role-pill" id="rolePill">Viewer</span>
+      <span class="logout-link" id="logoutLink" onclick="doLogout()">Keluar</span>
+      <div class="mode-pill" id="modeToggle">
+        <span class="dot"></span>
+        <span id="modeLabel">Data publik + simulasi</span>
+      </div>
+    </div>
+  </div>
+  <div class="hero-h1">Satu layar untuk<br>seluruh anak usaha.</div>
+  <div class="hero-sub">
+    Konsep tampilan operasional lintas anak usaha: Cidata, Kristalin, Kisagold, Super Emas, dalam satu tempat. Sebagian data publik dari situs resmi kalian, sebagian simulasi untuk ilustrasi. Ditandai jelas di tiap bagian.
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="num">6</div><div class="lbl">Anak usaha dalam grup</div></div>
+    <div class="kpi"><div class="num" id="kpiUnits">0</div><div class="lbl">Unit alat berat termonitor</div></div>
+    <div class="kpi"><div class="num" id="kpiBranches">6</div><div class="lbl">Cabang retail Super Emas</div></div>
+    <div class="kpi"><div class="num">Rp2.696.725</div><div class="lbl">Harga emas per gram, 9 Agu 2026</div></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="fleet">Fleet Cidata <span class="badge" id="fleetBadge">0</span></div>
+  <div class="tab" data-tab="retail">Retail Super Emas</div>
+  <div class="tab" data-tab="compliance">Perizinan</div>
+  <div class="tab" data-tab="approval">Approval <span class="badge" id="apprBadge">0</span></div>
+</div>
+
+<div class="content">
+
+  <!-- FLEET -->
+  <div class="panel active" id="panel-fleet">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Fleet Cidata Mining Servis</div>
+        <div class="panel-desc">Model unit awal bersumber dari cidatamining.com. Semua status, jumlah, dan unit baru di bawah bisa diatur langsung untuk simulasi.</div>
+      </div>
+      <div class="source-tag">Model unit: <b>data publik</b>, sisanya <b>simulasi</b></div>
+    </div>
+
+    <button class="btn admin-add" id="fleetAddBtn" onclick="fleetStartAdd()">+ Tambah unit alat berat</button>
+    <div class="grid cols-4" id="fleetGrid"></div>
+
+    <div class="log">
+      <div class="log-head">Aktivitas terbaru</div>
+      <div id="fleetLog"><div class="log-empty">Ubah status atau data unit untuk lihat simulasinya di sini.</div></div>
+    </div>
+  </div>
+
+  <!-- RETAIL -->
+  <div class="panel" id="panel-retail">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Jaringan Retail Super Emas</div>
+        <div class="panel-desc">Harga emas dan lokasi cabang riil dari situs publik. Volume transaksi harian tiap cabang simulasi. Versi produksi tersambung ke data kasir tiap cabang.</div>
+      </div>
+      <div class="source-tag">Harga dan cabang: <b>data publik</b></div>
+    </div>
+
+    <div class="price-strip">
+      <div class="price-cell">
+        <div class="lbl">Harga jual per gram</div>
+        <div class="val">Rp2.696.725</div>
+        <div class="meta">Setelah PPh 0,25%. Sumber: Logam Mulia Antam</div>
+      </div>
+      <div class="price-cell">
+        <div class="lbl">Harga buyback per gram</div>
+        <div class="val">Rp2.511.000</div>
+        <div class="meta">Update 9 Agustus 2026, 08.30 WIB</div>
+      </div>
+      <div class="price-cell">
+        <div style="color:var(--gray-500); font-size:12.5px; line-height:1.5; text-transform:none; letter-spacing:normal;">Di produksi, harga auto-refresh harian. Gak perlu update manual di 6 cabang.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;" class="sim-tag">Kolom transaksi dan omzet: data simulasi, bukan angka asli</div>
+
+    <button class="btn admin-add" id="branchAddBtn" onclick="branchStartAdd()">+ Tambah cabang</button>
+
+    <div class="table-scroll">
+    <table class="branch-table">
+      <thead><tr><th>Cabang</th><th>Transaksi hari ini</th><th>Estimasi omzet</th><th>Status</th><th></th></tr></thead>
+      <tbody id="branchBody"></tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- COMPLIANCE -->
+  <div class="panel" id="panel-compliance">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Perizinan dan kepatuhan</div>
+        <div class="panel-desc">Jenis izin awal riil, dari kristalin.co.id dan profil bisnis publik. Tanggal jatuh tempo ilustratif, buat nunjukin konsep pengingat otomatis.</div>
+      </div>
+      <div class="source-tag">Jenis izin awal: <b>data publik</b>, tanggal: <b>ilustratif</b></div>
+    </div>
+
+    <button class="btn admin-add" id="licAddBtn" onclick="licStartAdd()">+ Tambah izin</button>
+    <div class="sim-day-row">
+      <span class="sim-day-label" id="simDayLabel">Hitungan hari mengikuti tanggal hari ini: <b id="simDayDate"></b></span>
+      <button class="btn" onclick="simulateNextDay()">Simulasikan hari berikutnya &rarr;</button>
+      <button class="btn" id="simResetBtn" onclick="simulateReset()" style="display:none;">Reset ke hari ini</button>
+    </div>
+    <div class="grid cols-2" id="compGrid" style="margin-top:16px;"></div>
+  </div>
+
+  <!-- APPROVAL -->
+  <div class="panel" id="panel-approval">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Approval lintas anak usaha</div>
+        <div class="panel-desc">Contoh generik alur approval berjenjang lintas anak usaha. Bukan klaim soal proses approval kalian saat ini, hanya ilustrasi konsep satu tempat lihat semua status. Silakan disesuaikan ke alur aslinya.</div>
+      </div>
+      <div class="sim-tag">Seluruh isi tab ini: contoh dan simulasi</div>
+    </div>
+
+    <button class="btn admin-add" id="reqAddBtn" onclick="reqStartAdd()">+ Ajukan request baru</button>
+    <div class="grid cols-2" id="apprGrid" style="margin-top:16px;"></div>
+  </div>
+
+</div>
+
+<footer>
+  <div>Dibangun custom untuk Kisara Group. Bukan lisensi SaaS per-seat. Data publik disitat dari situs resmi masing-masing anak usaha.</div>
+  <div><b>Versi konsep</b>, siap dikembangkan lebih lanjut</div>
+</footer>
+
+</div>
+
+<script>
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ---------- AUTH (simulasi, bukan otentikasi asli) ----------
+let currentRole = null;
+
+function doLogin(){
+  const pass = document.getElementById('loginPass').value;
+  currentRole = (pass === 'admin123') ? 'admin' : 'viewer';
+  document.body.classList.remove('role-admin','role-viewer');
+  document.body.classList.add('role-'+currentRole);
+  const pill = document.getElementById('rolePill');
+  pill.textContent = currentRole === 'admin' ? 'Admin' : 'Viewer';
+  pill.className = 'role-pill ' + currentRole;
+  document.getElementById('loginGate').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  renderFleet(); renderBranches(); renderCompliance(); renderApprovals();
+}
+
+function doLogout(){
+  currentRole = null;
+  document.body.classList.remove('role-admin','role-viewer');
+  document.getElementById('loginPass').value = '';
+  document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('loginGate').style.display = 'flex';
+}
+
+// ---------- TABS ----------
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- MODE PILL ----------
+let liveMode = false;
+document.getElementById('modeToggle').addEventListener('click',()=>{
+  liveMode = !liveMode;
+  document.getElementById('modeLabel').textContent = liveMode ? 'Mode live, contoh belum tersambung' : 'Data publik + simulasi';
+});
+
+/* =========================================================
+   FLEET
+   source:'public'      nama, tipe, dan jumlah dari cidatamining.com
+   source:'unconfirmed'  nama dan tipe publik, jumlah belum tercantum
+   source:'manual'      ditambah / diubah admin saat demo
+   ========================================================= */
+let fleetSeq = 1;
+const fleet = [
+  {id:'u'+(fleetSeq++), name:'SY215C', type:'Excavator 21.5-ton', total:6, active:6, util:82, status:'ok', source:'public'},
+  {id:'u'+(fleetSeq++), name:'E6210F', type:'Excavator 21-ton', total:4, active:4, util:74, status:'ok', source:'public'},
+  {id:'u'+(fleetSeq++), name:'SY375H', type:'Excavator 37.5-ton', total:null, active:null, util:65, status:'ok', source:'unconfirmed'},
+  {id:'u'+(fleetSeq++), name:'GCR 300H', type:'Mobile crane 3-ton', total:null, active:null, util:40, status:'ok', source:'unconfirmed'},
+];
+let fleetEditId = null;
+let fleetDeleteId = null;
+
+function fleetCardHtml(u){
+  const statusLabel = u.status==='ok' ? 'Operasional' : u.status==='warn' ? 'Maintenance' : 'Standby';
+  const srcTag = u.source==='public' ? 'Dari situs publik' : 'Estimasi internal, belum diverifikasi';
+  const ratioHtml = (u.total===null)
+    ? `<div class="ratio empty">Jumlah unit belum diisi</div>`
+    : `<div class="ratio">${u.active}<small>/${u.total} unit aktif</small></div>`;
+  const pct = u.total!==null ? Math.round(u.active/u.total*100) : u.util;
+  const barCaption = u.total!==null
+    ? `${pct}% unit aktif`
+    : `Utilisasi ${u.util}% <span style="color:var(--gray-400)">(ilustratif)</span>`;
+  return `
+  <div class="card unit-card">
+    <div class="card-tools">
+      <button class="edit-btn" title="Edit unit" onclick="fleetStartEdit('${u.id}')">&#9998;</button>
+      <button class="del-btn" title="Hapus unit" onclick="fleetStartDelete('${u.id}')">&times;</button>
+    </div>
+    <div class="top">
+      <h4>${esc(u.name)}</h4>
+      <div class="type">${esc(u.type)}</div>
+      <span class="status ${u.status}"><span class="dot"></span>${statusLabel}</span>
+    </div>
+    <div class="src-tag">${srcTag}</div>
+    ${ratioHtml}
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+    <div class="type" style="margin-top:6px;">${barCaption}</div>
+    ${u.total!==null ? `
+    <div class="quick-actions">
+      <button class="qbtn ${u.status==='ok'?'on-active':''}" onclick="markFleetActive('${u.id}')">Tandai aktif</button>
+      <button class="qbtn ${u.status==='warn'?'on-warn':''}" onclick="markFleetMaintenance('${u.id}')">Tandai maintenance</button>
+    </div>` : `
+    <div class="qbtn-placeholder">Jumlah unit belum diverifikasi<br>Status manual belum tersedia</div>`}
+  </div>`;
+}
+
+function markFleetActive(id){
+  if(currentRole!=='admin') return;
+  const u = fleet.find(x=>x.id===id);
+  if(!u || u.total===null) return;
+  if(u.active >= u.total){
+    addFleetLog(`${esc(u.name)} dicek, semua unit masih aktif. Tetap ${u.active}/${u.total}`);
+    return;
+  }
+  u.active = u.active + 1;
+  u.status = u.active===u.total ? 'ok' : 'warn';
+  renderFleet();
+  addFleetLog(`${esc(u.name)} 1 unit kembali aktif. Unit aktif ${u.active}/${u.total}`);
+}
+
+function markFleetMaintenance(id){
+  if(currentRole!=='admin') return;
+  const u = fleet.find(x=>x.id===id);
+  if(!u || u.total===null) return;
+  if(u.active <= 0){
+    addFleetLog(`${esc(u.name)} dicek, semua unit masih maintenance. Tetap 0/${u.total}`);
+    return;
+  }
+  u.active = u.active - 1;
+  u.status = u.active===u.total ? 'ok' : 'warn';
+  renderFleet();
+  addFleetLog(`${esc(u.name)} 1 unit masuk maintenance. Unit aktif ${u.active}/${u.total}`);
+}
+
+function fleetFormHtml(u){
+  const id = u ? u.id : 'new';
+  const name = u ? u.name : '';
+  const type = u ? u.type : '';
+  const total = u && u.total!==null ? u.total : '';
+  const active = u && u.active!==null ? u.active : '';
+  return `
+  <div class="card unit-card">
+    <div class="edit-form">
+      <div><label class="field-label">Nama unit</label><input class="field-input" id="f-name-${id}" value="${esc(name)}" placeholder="Contoh: SY135C"></div>
+      <div><label class="field-label">Tipe / tonase</label><input class="field-input" id="f-type-${id}" value="${esc(type)}" placeholder="Contoh: Excavator 13.5-ton"></div>
+      <div><label class="field-label">Jumlah total unit</label><input class="field-input" type="number" min="1" id="f-total-${id}" value="${total}"></div>
+      <div><label class="field-label">Jumlah unit aktif</label><input class="field-input" type="number" min="0" id="f-active-${id}" value="${active}"></div>
+      <div class="edit-actions">
+        <button class="btn primary" onclick="fleetSave('${id}')">Simpan</button>
+        <button class="btn" onclick="fleetCancelEdit()">Batal</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function fleetConfirmHtml(u){
+  return `
+  <div class="card unit-card">
+    <div class="confirm-del">
+      <div class="msg">Hapus unit <b>${esc(u.name)}</b> dari daftar armada?</div>
+      <div class="row">
+        <button class="btn danger" onclick="fleetConfirmDelete('${u.id}')">Ya, hapus</button>
+        <button class="btn" onclick="fleetCancelDelete()">Batal</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderFleet(){
+  const grid = document.getElementById('fleetGrid');
+  let html = '';
+  if(fleetEditId === 'new') html += fleetFormHtml(null);
+  html += fleet.map(u=>{
+    if(fleetEditId === u.id) return fleetFormHtml(u);
+    if(fleetDeleteId === u.id) return fleetConfirmHtml(u);
+    return fleetCardHtml(u);
+  }).join('');
+  grid.innerHTML = html;
+  const known = fleet.filter(u=>u.total!==null).reduce((a,u)=>a+u.total,0);
+  document.getElementById('kpiUnits').textContent = known + (fleet.some(u=>u.total===null) ? '+' : '');
+  document.getElementById('fleetBadge').textContent = fleet.length;
+  const addBtn = document.getElementById('fleetAddBtn');
+  if(addBtn) addBtn.style.display = (currentRole==='admin' && !fleetEditId) ? 'inline-block' : 'none';
+}
+
+function fleetStartAdd(){ if(currentRole!=='admin') return; fleetDeleteId=null; fleetEditId='new'; renderFleet(); }
+function fleetStartEdit(id){ if(currentRole!=='admin') return; fleetDeleteId=null; fleetEditId=id; renderFleet(); }
+function fleetCancelEdit(){ fleetEditId=null; renderFleet(); }
+function fleetStartDelete(id){ if(currentRole!=='admin') return; fleetEditId=null; fleetDeleteId=id; renderFleet(); }
+function fleetCancelDelete(){ fleetDeleteId=null; renderFleet(); }
+
+function fleetConfirmDelete(id){
+  const idx = fleet.findIndex(x=>x.id===id);
+  if(idx>-1){ const u=fleet[idx]; fleet.splice(idx,1); addFleetLog(`Admin hapus unit ${esc(u.name)} dari daftar armada`); }
+  fleetDeleteId=null;
+  renderFleet();
+}
+
+function fleetSave(id){
+  const isNew = id==='new';
+  const nameEl = document.getElementById('f-name-'+id);
+  const typeEl = document.getElementById('f-type-'+id);
+  const totalEl = document.getElementById('f-total-'+id);
+  const activeEl = document.getElementById('f-active-'+id);
+  const name = nameEl.value.trim();
+  const type = typeEl.value.trim();
+  const total = parseInt(totalEl.value,10);
+  let active = parseInt(activeEl.value,10);
+  if(!name){ nameEl.focus(); return; }
+  if(isNaN(total) || total<1){ totalEl.focus(); return; }
+  if(isNaN(active) || active<0) active = total;
+  if(active>total) active = total;
+  if(isNew){
+    fleet.unshift({id:'u'+(fleetSeq++), name, type: type||'Alat berat', total, active, util:70, status: active===0?'warn':'ok', source:'manual'});
+    addFleetLog(`Admin tambah unit baru: ${esc(name)} (${total} unit)`);
+  } else {
+    const u = fleet.find(x=>x.id===id);
+    u.name=name; u.type=type||u.type; u.total=total; u.active=active; u.status= active===0?'warn':'ok'; u.source='manual';
+    addFleetLog(`Admin ubah data ${esc(name)}: ${active}/${total} unit aktif`);
+  }
+  fleetEditId=null;
+  renderFleet();
+}
+
+function addFleetLog(msg){
+  const log = document.getElementById('fleetLog');
+  if(log.querySelector('.log-empty')) log.innerHTML = '';
+  const time = new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  item.innerHTML = `<span>${msg}</span><span class="t">${time} WIB</span>`;
+  log.prepend(item);
+}
+
+renderFleet();
+
+/* =========================================================
+   RETAIL
+   ========================================================= */
+let branchSeq = 1;
+const branches = [
+  {id:'b'+(branchSeq++), name:'Super Emas Tangerang', addr:'Jl. A. Damyati, Sukasari, Kota Tangerang', tx:14, omzet:'Rp210.000.000'},
+  {id:'b'+(branchSeq++), name:'Super Emas Depok', addr:'Jl. Arif Rahman Hakim, Depok Jaya', tx:9, omzet:'Rp138.000.000'},
+  {id:'b'+(branchSeq++), name:'Super Emas Bintaro', addr:'Jl. Jombang Raya, Pd. Pucung, Tangsel', tx:11, omzet:'Rp165.500.000'},
+  {id:'b'+(branchSeq++), name:'Super Emas Cibubur', addr:'Jl. Transyogi, Jatisampurna, Bekasi', tx:7, omzet:'Rp94.000.000'},
+  {id:'b'+(branchSeq++), name:'Super Emas Duren Sawit', addr:'Jl. Pahlawan Revolusi, Jakarta Timur', tx:12, omzet:'Rp171.000.000'},
+  {id:'b'+(branchSeq++), name:'Super Emas Bekasi', addr:'Jl. Caman Raya, Jatibening, Bekasi', tx:8, omzet:'Rp103.500.000'},
+];
+let branchEditId = null;
+let branchDeleteId = null;
+
+function branchRowHtml(b){
+  return `
+  <tr>
+    <td><div class="bname">${esc(b.name)}</div><div class="addr">${esc(b.addr)}</div></td>
+    <td class="num">${b.tx} transaksi</td>
+    <td class="num">${esc(b.omzet)}</td>
+    <td><span class="status ok"><span class="dot"></span>Buka</span></td>
+    <td>
+      <div class="rowtools">
+        <button class="edit-btn" title="Edit cabang" onclick="branchStartEdit('${b.id}')">&#9998;</button>
+        <button class="del-btn" title="Hapus cabang" onclick="branchStartDelete('${b.id}')">&times;</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function branchFormRow(b){
+  const id = b ? b.id : 'new';
+  const name = b ? b.name : '';
+  const addr = b ? b.addr : '';
+  const tx = b ? b.tx : 0;
+  const omzet = b ? b.omzet : '';
+  return `
+  <tr><td colspan="5">
+    <div class="row-form">
+      <div><label class="field-label">Nama cabang</label><input class="field-input" id="b-name-${id}" value="${esc(name)}"></div>
+      <div><label class="field-label">Alamat</label><input class="field-input" id="b-addr-${id}" value="${esc(addr)}"></div>
+      <div><label class="field-label">Transaksi hari ini</label><input class="field-input" type="number" min="0" id="b-tx-${id}" value="${tx}"></div>
+      <div><label class="field-label">Estimasi omzet</label><input class="field-input" id="b-omzet-${id}" value="${esc(omzet)}" placeholder="Rp0"></div>
+    </div>
+    <div class="edit-actions">
+      <button class="btn primary" onclick="branchSave('${id}')">Simpan</button>
+      <button class="btn" onclick="branchCancelEdit()">Batal</button>
+    </div>
+  </td></tr>`;
+}
+
+function branchConfirmRow(b){
+  return `
+  <tr><td colspan="5">
+    <div class="confirm-del">
+      <div class="msg">Hapus cabang <b>${esc(b.name)}</b>?</div>
+      <div class="row">
+        <button class="btn danger" onclick="branchConfirmDelete('${b.id}')">Ya, hapus</button>
+        <button class="btn" onclick="branchCancelDelete()">Batal</button>
+      </div>
+    </div>
+  </td></tr>`;
+}
+
+function renderBranches(){
+  let html = '';
+  if(branchEditId==='new') html += branchFormRow(null);
+  html += branches.map(b=>{
+    if(branchEditId===b.id) return branchFormRow(b);
+    if(branchDeleteId===b.id) return branchConfirmRow(b);
+    return branchRowHtml(b);
+  }).join('');
+  document.getElementById('branchBody').innerHTML = html;
+  document.getElementById('kpiBranches').textContent = branches.length;
+  const addBtn = document.getElementById('branchAddBtn');
+  if(addBtn) addBtn.style.display = (currentRole==='admin' && !branchEditId) ? 'inline-block' : 'none';
+}
+renderBranches();
+
+function branchStartAdd(){ if(currentRole!=='admin') return; branchDeleteId=null; branchEditId='new'; renderBranches(); }
+function branchStartEdit(id){ if(currentRole!=='admin') return; branchDeleteId=null; branchEditId=id; renderBranches(); }
+function branchCancelEdit(){ branchEditId=null; renderBranches(); }
+function branchStartDelete(id){ if(currentRole!=='admin') return; branchEditId=null; branchDeleteId=id; renderBranches(); }
+function branchCancelDelete(){ branchDeleteId=null; renderBranches(); }
+
+function branchConfirmDelete(id){
+  const idx = branches.findIndex(x=>x.id===id);
+  if(idx>-1) branches.splice(idx,1);
+  branchDeleteId=null;
+  renderBranches();
+}
+
+function branchSave(id){
+  const isNew = id==='new';
+  const name = document.getElementById('b-name-'+id).value.trim();
+  const addr = document.getElementById('b-addr-'+id).value.trim();
+  const tx = parseInt(document.getElementById('b-tx-'+id).value,10);
+  const omzet = document.getElementById('b-omzet-'+id).value.trim();
+  if(!name) return;
+  if(isNew){
+    branches.push({id:'b'+(branchSeq++), name, addr: addr||'-', tx: isNaN(tx)?0:tx, omzet: omzet||'Rp0'});
+  } else {
+    const b = branches.find(x=>x.id===id);
+    b.name=name; b.addr=addr||b.addr; b.tx= isNaN(tx)?b.tx:tx; b.omzet=omzet||b.omzet;
+  }
+  branchEditId=null;
+  renderBranches();
+}
+
+/* =========================================================
+   COMPLIANCE
+   ========================================================= */
+let licSeq = 1;
+let simDayOffset = 0;
+const licenses = [
+  {id:'l'+(licSeq++), name:'IUP (Izin Usaha Pertambangan)', entity:'Kristalin Ekalestari', sub:'Konsesi tambang emas, Papua', due:'2026-12-05'},
+  {id:'l'+(licSeq++), name:'IUP-OPK', entity:'Agaro Tri Niaga', sub:'Izin usaha jual-beli produk tambang', due:'2026-09-25'},
+  {id:'l'+(licSeq++), name:'Registrasi MODI', entity:'Kristalin Ekalestari', sub:'Minerba Online Data Indonesia', due:'2027-03-07'},
+  {id:'l'+(licSeq++), name:'Sertifikasi SNI 99.99%', entity:'KISA24', sub:'Standar kemurnian emas batangan', due:'2026-08-24'},
+];
+let licEditId = null;
+let licDeleteId = null;
+
+function simToday(){
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate()+simDayOffset);
+  return d;
+}
+function daysUntil(dueStr){
+  const due = new Date(dueStr+'T00:00:00');
+  return Math.ceil((due - simToday()) / 86400000);
+}
+function simulateNextDay(){ simDayOffset++; renderCompliance(); }
+function simulateReset(){ simDayOffset=0; renderCompliance(); }
+
+function urgencyFromDays(d){ if(d<=21) return 'danger'; if(d<=60) return 'warn'; return 'ok'; }
+
+function licCardHtml(l){
+  const days = daysUntil(l.due);
+  const urgency = urgencyFromDays(days);
+  const urgencyLabel = days<0 ? 'Lewat jatuh tempo' : urgency==='ok' ? 'Aman' : urgency==='warn' ? 'Perlu diurus' : 'Mendesak';
+  return `
+  <div class="card comp-card">
+    <div class="card-tools">
+      <button class="edit-btn" title="Edit izin" onclick="licStartEdit('${l.id}')">&#9998;</button>
+      <button class="del-btn" title="Hapus izin" onclick="licStartDelete('${l.id}')">&times;</button>
+    </div>
+    <div class="comp-left">
+      <h4>${esc(l.name)}</h4>
+      <div class="sub">${esc(l.sub)}</div>
+      <div class="entity">${esc(l.entity)}</div>
+    </div>
+    <div class="comp-right">
+      <div class="days" style="color:var(--${days<0?'danger':urgency})">${days}<small> hari</small></div>
+      <span class="status ${days<0?'danger':urgency}"><span class="dot"></span>${urgencyLabel}</span>
+    </div>
+  </div>`;
+}
+
+function licFormHtml(l){
+  const id = l ? l.id : 'new';
+  const currentDays = l ? daysUntil(l.due) : 90;
+  return `
+  <div class="card comp-card" style="display:block; padding-right:18px;">
+    <div class="edit-form">
+      <div><label class="field-label">Nama izin</label><input class="field-input" id="l-name-${id}" value="${esc(l?l.name:'')}"></div>
+      <div><label class="field-label">Entitas</label><input class="field-input" id="l-entity-${id}" value="${esc(l?l.entity:'')}"></div>
+      <div><label class="field-label">Keterangan singkat</label><input class="field-input" id="l-sub-${id}" value="${esc(l?l.sub:'')}"></div>
+      <div><label class="field-label">Sisa hari sebelum jatuh tempo (dari hari ini)</label><input class="field-input" type="number" min="0" id="l-days-${id}" value="${currentDays}"></div>
+      <div class="edit-actions">
+        <button class="btn primary" onclick="licSave('${id}')">Simpan</button>
+        <button class="btn" onclick="licCancelEdit()">Batal</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function licConfirmHtml(l){
+  return `
+  <div class="card comp-card" style="display:block; padding-right:18px;">
+    <div class="confirm-del">
+      <div class="msg">Hapus izin <b>${esc(l.name)}</b>?</div>
+      <div class="row">
+        <button class="btn danger" onclick="licConfirmDelete('${l.id}')">Ya, hapus</button>
+        <button class="btn" onclick="licCancelDelete()">Batal</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderCompliance(){
+  let html = '';
+  if(licEditId==='new') html += licFormHtml(null);
+  html += licenses.map(l=>{
+    if(licEditId===l.id) return licFormHtml(l);
+    if(licDeleteId===l.id) return licConfirmHtml(l);
+    return licCardHtml(l);
+  }).join('');
+  document.getElementById('compGrid').innerHTML = html;
+  const addBtn = document.getElementById('licAddBtn');
+  if(addBtn) addBtn.style.display = (currentRole==='admin' && !licEditId) ? 'inline-block' : 'none';
+  const dateLabel = document.getElementById('simDayDate');
+  if(dateLabel){
+    const opts = {weekday:'long', day:'numeric', month:'long', year:'numeric'};
+    const suffix = simDayOffset>0 ? ` (simulasi +${simDayOffset} hari)` : '';
+    dateLabel.textContent = simToday().toLocaleDateString('id-ID', opts) + suffix;
+  }
+  const resetBtn = document.getElementById('simResetBtn');
+  if(resetBtn) resetBtn.style.display = simDayOffset>0 ? 'inline-block' : 'none';
+}
+renderCompliance();
+
+function licStartAdd(){ if(currentRole!=='admin') return; licDeleteId=null; licEditId='new'; renderCompliance(); }
+function licStartEdit(id){ if(currentRole!=='admin') return; licDeleteId=null; licEditId=id; renderCompliance(); }
+function licCancelEdit(){ licEditId=null; renderCompliance(); }
+function licStartDelete(id){ if(currentRole!=='admin') return; licEditId=null; licDeleteId=id; renderCompliance(); }
+function licCancelDelete(){ licDeleteId=null; renderCompliance(); }
+
+function licConfirmDelete(id){
+  const idx = licenses.findIndex(x=>x.id===id);
+  if(idx>-1) licenses.splice(idx,1);
+  licDeleteId=null;
+  renderCompliance();
+}
+
+function licSave(id){
+  const isNew = id==='new';
+  const name = document.getElementById('l-name-'+id).value.trim();
+  const entity = document.getElementById('l-entity-'+id).value.trim();
+  const sub = document.getElementById('l-sub-'+id).value.trim();
+  const days = parseInt(document.getElementById('l-days-'+id).value,10);
+  if(!name) return;
+  if(isNaN(days) || days<0) return;
+  const due = new Date(simToday().getTime() + days*86400000).toISOString().slice(0,10);
+  if(isNew){
+    licenses.push({id:'l'+(licSeq++), name, entity: entity||'-', sub: sub||'-', due});
+  } else {
+    const l = licenses.find(x=>x.id===id);
+    l.name=name; l.entity=entity||l.entity; l.sub=sub||l.sub; l.due=due;
+  }
+  licEditId=null;
+  renderCompliance();
+}
+
+/* =========================================================
+   APPROVAL
+   ========================================================= */
+let reqSeq = 1;
+const requests = [
+  {id:'r'+(reqSeq++), title:'Pengadaan sparepart excavator SY215C', entity:'Cidata Mining Servis', amt:'Rp45.000.000', step:1},
+  {id:'r'+(reqSeq++), title:'Reimbursement program CSR Kuri Wamesa', entity:'Kristalin Ekalestari', amt:'Rp12.000.000', step:2},
+  {id:'r'+(reqSeq++), title:'Restock emas batangan KISA24', entity:'Kisagold', amt:'Rp800.000.000', step:0},
+  {id:'r'+(reqSeq++), title:'Sewa tambahan mobile crane', entity:'Cidata Mining Servis', amt:'Rp28.500.000', step:3},
+];
+const steps = ['Site/Ops Manager','COO','CEO'];
+let reqEditId = null;
+let reqDeleteId = null;
+
+function reqCardHtml(r){
+  const chainHtml = steps.map((s,i)=>{
+    let cls = '';
+    if(r.step===-1){ cls = i===0?'rejected':''; }
+    else if(i < r.step) cls='done';
+    else if(i === r.step) cls='pending';
+    return `
+      <div class="chain-step">
+        <div class="chain-node ${cls}">${cls==='done'?'&check;':cls==='rejected'?'&times;':i+1}</div>
+        <div class="chain-label">${s}</div>
+      </div>
+      ${i < steps.length-1 ? `<div class="chain-line ${i < r.step ? 'done':''}"></div>` : ''}
+    `;
+  }).join('');
+  const statusText = r.step===-1 ? 'Ditolak' : r.step>=steps.length ? 'Disetujui penuh' : `Menunggu approval: ${steps[r.step]}`;
+  const canDecide = currentRole==='admin' && r.step>=0 && r.step<steps.length;
+  return `
+  <div class="card req-card">
+    <div class="card-tools">
+      <button class="edit-btn" title="Edit request" onclick="reqStartEdit('${r.id}')">&#9998;</button>
+      <button class="del-btn" title="Tarik request" onclick="reqStartDelete('${r.id}')">&times;</button>
+    </div>
+    <div class="req-top">
+      <div class="req-title">${esc(r.title)}</div>
+      <div class="req-entity">${esc(r.entity)}</div>
+      <div class="req-amt">${esc(r.amt)}</div>
+    </div>
+    <div class="chain">${chainHtml}</div>
+    <div class="req-actions">
+      <span class="req-status-txt">${statusText}</span>
+      ${canDecide ? `
+      <div style="display:flex; gap:6px;">
+        <button class="btn reject" onclick="decideReq('${r.id}','reject')">Tolak</button>
+        <button class="btn primary" onclick="decideReq('${r.id}','approve')">Setujui</button>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function reqFormHtml(r){
+  const id = r ? r.id : 'new';
+  return `
+  <div class="card req-card">
+    <div class="edit-form req-form">
+      <div><label class="field-label">Judul request</label><input class="field-input" id="r-title-${id}" value="${esc(r?r.title:'')}" placeholder="Contoh: Pengadaan ban dump truck"></div>
+      <div><label class="field-label">Entitas pengaju</label><input class="field-input" id="r-entity-${id}" value="${esc(r?r.entity:'')}" placeholder="Contoh: Cidata Mining Servis"></div>
+      <div><label class="field-label">Nominal</label><input class="field-input" id="r-amt-${id}" value="${esc(r?r.amt:'')}" placeholder="Contoh: Rp10.000.000"></div>
+      <div class="edit-actions">
+        <button class="btn primary" onclick="reqSave('${id}')">Simpan</button>
+        <button class="btn" onclick="reqCancelEdit()">Batal</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function reqConfirmHtml(r){
+  return `
+  <div class="card req-card">
+    <div class="confirm-del req-confirm">
+      <div class="msg">Tarik request <b>${esc(r.title)}</b>?</div>
+      <div class="row">
+        <button class="btn danger" onclick="reqConfirmDelete('${r.id}')">Ya, tarik</button>
+        <button class="btn" onclick="reqCancelDelete()">Batal</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderApprovals(){
+  let html = '';
+  if(reqEditId==='new') html += reqFormHtml(null);
+  html += requests.map(r=>{
+    if(reqEditId===r.id) return reqFormHtml(r);
+    if(reqDeleteId===r.id) return reqConfirmHtml(r);
+    return reqCardHtml(r);
+  }).join('');
+  document.getElementById('apprGrid').innerHTML = html;
+  document.getElementById('apprBadge').textContent = requests.filter(r=>r.step>=0 && r.step<steps.length).length;
+  const addBtn = document.getElementById('reqAddBtn');
+  if(addBtn) addBtn.style.display = (currentRole==='admin' && !reqEditId) ? 'inline-block' : 'none';
+}
+
+function decideReq(id, action){
+  if(currentRole!=='admin') return;
+  const r = requests.find(x=>x.id===id);
+  if(!r) return;
+  r.step = action==='approve' ? Math.min(r.step+1, steps.length) : -1;
+  renderApprovals();
+}
+
+function reqStartAdd(){ if(currentRole!=='admin') return; reqDeleteId=null; reqEditId='new'; renderApprovals(); }
+function reqStartEdit(id){ if(currentRole!=='admin') return; reqDeleteId=null; reqEditId=id; renderApprovals(); }
+function reqCancelEdit(){ reqEditId=null; renderApprovals(); }
+function reqStartDelete(id){ if(currentRole!=='admin') return; reqEditId=null; reqDeleteId=id; renderApprovals(); }
+function reqCancelDelete(){ reqDeleteId=null; renderApprovals(); }
+
+function reqConfirmDelete(id){
+  const idx = requests.findIndex(x=>x.id===id);
+  if(idx>-1) requests.splice(idx,1);
+  reqDeleteId=null;
+  renderApprovals();
+}
+
+function reqSave(id){
+  const isNew = id==='new';
+  const title = document.getElementById('r-title-'+id).value.trim();
+  const entity = document.getElementById('r-entity-'+id).value.trim();
+  const amt = document.getElementById('r-amt-'+id).value.trim();
+  if(!title) return;
+  if(isNew){
+    requests.unshift({id:'r'+(reqSeq++), title, entity: entity||'-', amt: amt||'-', step:0});
+  } else {
+    const r = requests.find(x=>x.id===id);
+    r.title=title; r.entity=entity||r.entity; r.amt=amt||r.amt;
+  }
+  reqEditId=null;
+  renderApprovals();
+}
+
+renderApprovals();
+</script>
+
+</body>
+</html>
