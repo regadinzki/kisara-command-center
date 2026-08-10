@@ -128,6 +128,23 @@
   .sheet-live .acts{display:flex; gap:8px;}
   .steps{margin:12px 0 0; padding-left:18px; font-size:12px; color:var(--gray-500); line-height:1.9;}
   .steps b{color:var(--black);}
+
+  /* ---------- PEMBACAAN OTOMATIS ---------- */
+  .bacaan{border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; margin-top:16px; background:var(--white);}
+  .bacaan-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .bacaan-title{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;}
+  .bacaan-note{font-size:11.5px; color:var(--gray-400);}
+  .bacaan-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:11px;}
+  .bacaan-list li{display:flex; gap:11px; align-items:flex-start; font-size:13px; line-height:1.6; color:var(--gray-700);}
+  .bacaan-list .tanda{width:7px; height:7px; border-radius:50%; flex:none; margin-top:7px; background:var(--gray-400);}
+  .bacaan-list li.b-penting .tanda{background:var(--danger);}
+  .bacaan-list li.b-perhatian .tanda{background:var(--warn);}
+  .bacaan-list li.b-catatan .tanda{background:var(--accent);}
+  .bacaan-list li.b-aman .tanda{background:var(--ok);}
+  .bacaan-kosong{
+    border:1px dashed var(--gray-200); border-radius:var(--radius); padding:18px;
+    margin-top:16px; font-size:12.5px; color:var(--gray-400); text-align:center;
+  }
   .delta{font-size:12px; font-weight:700; margin-left:10px; display:inline-flex; align-items:center; gap:3px; cursor:default;}
   .delta .arrow{font-size:8.5px; line-height:1;}
   .delta.up{color:var(--ok);}
@@ -501,6 +518,7 @@
 
     <div id="sheetStatus"></div>
     <div id="importPanel"></div>
+    <div id="bacaanPanel"></div>
 
     <div class="table-scroll">
     <table class="branch-table">
@@ -882,6 +900,7 @@ function renderBranches(){
   if(addBtn) addBtn.style.display = (currentRole==='admin' && !branchEditId) ? 'inline-block' : 'none';
   updateRetailSourceTag();
   renderSheetStatus();
+  renderBacaan();
   renderAttention();
 }
 renderBranches();
@@ -984,12 +1003,7 @@ async function fetchSheet(){
     if(!parsed || !parsed.rows.length) throw new Error('isi kosong');
     const h = parsed.headers;
     importData = {fileName: 'Google Sheet', headers: h, rows: parsed.rows, source: 'sheet', url};
-    importMap = sheetConn ? sheetConn.map : {
-      tanggal: guessCol(h, ['tanggal','date','tgl']),
-      cabang: guessCol(h, ['cabang','toko','outlet','store','lokasi','nama']),
-      transaksi: guessCol(h, ['total trx','total transaksi','jumlah transaksi','jml transaksi','transaksi','trx','jumlah','qty','order']),
-      omzet: guessCol(h, ['omzet','penjualan','sales','nominal','rupiah','total'])
-    };
+    importMap = sheetConn ? sheetConn.map : tebakKolom(h);
     renderImportPanel();
   }catch(e){
     if(err) err.innerHTML = `<div class="import-error">Gagal menarik data. Pastikan sheet sudah dipublikasikan ke web lewat File, Bagikan, Publikasikan ke web. (${esc(e.message)})</div>`;
@@ -1080,15 +1094,21 @@ function handleImportFile(input){
     }
     importData = {fileName: file.name, headers: parsed.headers, rows: parsed.rows};
     const h = parsed.headers;
-    importMap = {
-      tanggal: guessCol(h, ['tanggal','date','tgl']),
-      cabang: guessCol(h, ['cabang','toko','outlet','store','lokasi','nama']),
-      transaksi: guessCol(h, ['total trx','total transaksi','jumlah transaksi','jml transaksi','transaksi','trx','jumlah','qty','order']),
-      omzet: guessCol(h, ['omzet','penjualan','sales','nominal','rupiah','total'])
-    };
+    importMap = tebakKolom(h);
     renderImportPanel();
   };
   reader.readAsText(file);
+}
+
+function tebakKolom(h){
+  return {
+    tanggal: guessCol(h, ['tanggal','date','tgl']),
+    cabang: guessCol(h, ['cabang','toko','outlet','store','lokasi','nama']),
+    transaksi: guessCol(h, ['total trx','total transaksi','jumlah transaksi','jml transaksi','transaksi','trx','jumlah','qty','order']),
+    omzet: guessCol(h, ['omzet','penjualan','sales','nominal','rupiah','total']),
+    buyback: guessCol(h, ['buyback','buy back','beli kembali','gadai']),
+    catatan: guessCol(h, ['catatan','keterangan','note','ket','remark','komentar'])
+  };
 }
 
 function setMap(field, value){
@@ -1131,6 +1151,8 @@ function renderImportPanel(){
       ${field('transaksi','Jumlah transaksi','Angka. Teks non-angka diabaikan', true)}
       ${field('omzet','Nilai omzet','Boleh ada Rp dan titik', false)}
       ${field('tanggal','Tanggal','Kalau ada, dipakai untuk bandingkan hari sebelumnya', false)}
+      ${field('buyback','Nilai buyback','Dipakai untuk lihat pergeseran beli dan jual', false)}
+      ${field('catatan','Catatan lapangan','Dibaca untuk cari sebab angka turun', false)}
     </div>
     <div class="import-preview">
       <table>
@@ -1179,6 +1201,7 @@ function applyImport(){
   const mOmz = importMap.omzet, mTgl = importMap.tanggal;
 
   // kelompokkan per cabang, simpan urut tanggal kalau ada
+  const mBuy = importMap.buyback, mCat = importMap.catatan;
   const perCabang = {};
   rows.forEach(r=>{
     const nama = String(r[mCab]||'').trim();
@@ -1187,7 +1210,9 @@ function applyImport(){
     perCabang[nama].push({
       tgl: mTgl > -1 ? String(r[mTgl]||'').trim() : '',
       tx: toNumber(r[mTx]),
-      omzet: mOmz > -1 ? toNumber(r[mOmz]) : null
+      omzet: mOmz > -1 ? toNumber(r[mOmz]) : null,
+      buyback: mBuy > -1 ? toNumber(r[mBuy]) : null,
+      catatan: mCat > -1 ? String(r[mCat]||'').trim() : ''
     });
   });
 
@@ -1202,7 +1227,12 @@ function applyImport(){
       addr: mTgl > -1 && terakhir.tgl ? 'Data per ' + terakhir.tgl : 'Dari file impor',
       tx: terakhir.tx,
       txPrev: sebelum ? sebelum.tx : terakhir.tx,
-      omzet: terakhir.omzet !== null ? formatRupiah(terakhir.omzet) : 'Tidak diisi'
+      omzet: terakhir.omzet !== null ? formatRupiah(terakhir.omzet) : 'Tidak diisi',
+      omzetNum: terakhir.omzet,
+      buyback: terakhir.buyback,
+      buybackPrev: sebelum ? sebelum.buyback : null,
+      catatan: terakhir.catatan,
+      tgl: terakhir.tgl
     };
   });
 
@@ -1245,6 +1275,100 @@ function updateRetailSourceTag(){
         : 'Kolom transaksi dan omzet: data simulasi, bukan angka asli';
   }
   if(resetBtn) resetBtn.style.display = (importedFrom && currentRole==='admin') ? 'inline-block' : 'none';
+}
+
+/* =========================================================
+   PEMBACAAN OTOMATIS
+   Wadah tetap, otaknya bisa ditukar. Sekarang pakai logika biasa,
+   nanti fungsi otakBaca() diganti panggilan ke AI lewat perantara.
+   ========================================================= */
+
+// kumpulkan bahan mentah yang relevan saja
+function bahanBacaan(){
+  return branches.map(b=>({
+    nama: b.name,
+    tx: b.tx,
+    txPrev: (typeof b.txPrev === 'number') ? b.txPrev : b.tx,
+    omzet: (typeof b.omzetNum === 'number') ? b.omzetNum : null,
+    buyback: (typeof b.buyback === 'number') ? b.buyback : null,
+    buybackPrev: (typeof b.buybackPrev === 'number') ? b.buybackPrev : null,
+    catatan: b.catatan || ''
+  }));
+}
+
+function persen(a, b){
+  if(!b) return null;
+  return Math.round(((a - b) / b) * 100);
+}
+
+// OTAK versi logika biasa
+function otakBaca(bahan){
+  const temuan = [];
+
+  const turun = bahan.filter(b=>b.tx < b.txPrev)
+                     .sort((a,b)=>(a.tx-a.txPrev)-(b.tx-b.txPrev));
+  turun.forEach(b=>{
+    const selisih = b.txPrev - b.tx;
+    const pct = persen(b.tx, b.txPrev);
+    let teks = `${b.nama} turun ${selisih} transaksi`;
+    if(pct !== null) teks += ` atau ${Math.abs(pct)} persen dibanding hari sebelumnya`;
+    if(b.catatan) teks += `, dan di catatan hari itu tertulis "${b.catatan}"`;
+    temuan.push({tingkat: b.catatan ? 'penting' : 'perhatian', teks: teks + '.'});
+  });
+
+  // catatan yang ada tapi angkanya tidak turun, sering terlewat
+  bahan.filter(b=>b.catatan && b.tx >= b.txPrev).forEach(b=>{
+    temuan.push({tingkat:'catatan', teks:`${b.nama} angkanya tidak turun, tapi ada catatan "${b.catatan}" yang perlu dicek.`});
+  });
+
+  // pergeseran beli dan jual
+  const adaBuyback = bahan.some(b=>b.buyback !== null && b.buybackPrev !== null);
+  if(adaBuyback){
+    const totalBuy = bahan.reduce((a,b)=>a+(b.buyback||0),0);
+    const totalBuyPrev = bahan.reduce((a,b)=>a+(b.buybackPrev||0),0);
+    const totalJual = bahan.reduce((a,b)=>a+(b.omzet||0),0);
+    const gBuy = persen(totalBuy, totalBuyPrev);
+    if(gBuy !== null && totalJual > 0){
+      const rasio = Math.round((totalBuy/totalJual)*100);
+      if(gBuy > 5){
+        temuan.push({tingkat:'penting', teks:`Buyback naik ${gBuy} persen dibanding hari sebelumnya dan sekarang setara ${rasio} persen dari nilai penjualan. Kalau pola ini lanjut, artinya lebih banyak orang mencairkan emas, bukan membeli.`});
+      } else if(gBuy < -5){
+        temuan.push({tingkat:'catatan', teks:`Buyback turun ${Math.abs(gBuy)} persen dibanding hari sebelumnya, sekarang setara ${rasio} persen dari nilai penjualan. Permintaan beli sedang lebih kuat dari kebutuhan mencairkan.`});
+      } else {
+        const arah = gBuy === 0 ? 'tidak berubah' : (gBuy > 0 ? `naik ${gBuy} persen` : `turun ${Math.abs(gBuy)} persen`);
+        temuan.push({tingkat:'catatan', teks:`Buyback ${arah} dibanding hari sebelumnya, setara ${rasio} persen dari nilai penjualan. Masih dalam batas wajar.`});
+      }
+    }
+  }
+
+  if(!temuan.length){
+    temuan.push({tingkat:'aman', teks:'Tidak ada cabang yang turun dan tidak ada catatan lapangan yang perlu ditindak.'});
+  }
+  return temuan;
+}
+
+function renderBacaan(){
+  if(!appReady) return;
+  const box = document.getElementById('bacaanPanel');
+  if(!box) return;
+
+  const punyaData = sheetConn || importedFrom;
+  if(!punyaData){
+    box.innerHTML = `<div class="bacaan-kosong">Sambungkan Google Sheet atau impor file untuk melihat pembacaan otomatis.</div>`;
+    return;
+  }
+
+  const temuan = otakBaca(bahanBacaan());
+  box.innerHTML = `
+  <div class="bacaan">
+    <div class="bacaan-head">
+      <span class="bacaan-title">Pembacaan otomatis</span>
+      <span class="bacaan-note">Disusun dari angka dan catatan di sumber data, bukan tebakan</span>
+    </div>
+    <ul class="bacaan-list">
+      ${temuan.map(t=>`<li class="b-${t.tingkat}"><span class="tanda"></span><span>${esc(t.teks)}</span></li>`).join('')}
+    </ul>
+  </div>`;
 }
 
 /* =========================================================
