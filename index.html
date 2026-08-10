@@ -650,7 +650,9 @@ let fleetEditId = null;
 let fleetDeleteId = null;
 
 function fleetCardHtml(u){
-  const statusLabel = u.status==='ok' ? 'Operasional' : u.status==='warn' ? 'Maintenance' : 'Standby';
+  const statusLabel = u.status==='ok' ? 'Operasional'
+    : u.status==='danger' ? 'Semua unit maintenance'
+    : `${u.total - u.active} unit maintenance`;
   const srcTag = u.source==='public' ? 'Dari situs publik' : 'Belum diverifikasi';
   const ratioHtml = (u.total===null)
     ? `<div class="ratio empty">Jumlah unit belum diisi</div>`
@@ -692,8 +694,8 @@ function markFleetActive(id){
     return;
   }
   u.active = u.active + 1;
-  u.status = u.active===u.total ? 'ok' : 'warn';
-  renderFleet();
+  u.status = hitungStatusFleet(u);
+  renderFleet(false);
   addFleetLog(`${esc(u.name)} 1 unit kembali aktif. Unit aktif ${u.active}/${u.total}`);
 }
 
@@ -706,8 +708,8 @@ function markFleetMaintenance(id){
     return;
   }
   u.active = u.active - 1;
-  u.status = u.active===u.total ? 'ok' : 'warn';
-  renderFleet();
+  u.status = hitungStatusFleet(u);
+  renderFleet(false);
   addFleetLog(`${esc(u.name)} 1 unit masuk maintenance. Unit aktif ${u.active}/${u.total}`);
 }
 
@@ -747,14 +749,32 @@ function fleetConfirmHtml(u){
 
 function fleetNeedsAction(u){ return u.total!==null && u.active < u.total; }
 
-function renderFleet(){
+// satu-satunya aturan status, dipakai semua jalur supaya tidak beda hasil
+function hitungStatusFleet(u){
+  if(u.total===null) return 'ok';
+  if(u.active >= u.total) return 'ok';
+  if(u.active <= 0) return 'danger';
+  return 'warn';
+}
+
+let urutanFleet = null; // urutan tampil disimpan supaya kartu tidak lompat saat ditandai
+
+function renderFleet(susunUlang = true){
   const grid = document.getElementById('fleetGrid');
   let html = '';
   if(fleetEditId === 'new') html += fleetFormHtml(null);
-  const ordered = fleet.slice().sort((a,b)=>{
-    const rank = u => fleetNeedsAction(u) ? 0 : (u.total===null ? 2 : 1);
-    return rank(a)-rank(b);
-  });
+
+  if(susunUlang || !urutanFleet){
+    urutanFleet = fleet.slice().sort((a,b)=>{
+      const rank = u => fleetNeedsAction(u) ? 0 : (u.total===null ? 2 : 1);
+      return rank(a)-rank(b);
+    }).map(u=>u.id);
+  }
+  // pakai urutan yang tersimpan, buang yang sudah dihapus, tambahkan yang baru
+  const ordered = urutanFleet.map(id=>fleet.find(u=>u.id===id)).filter(Boolean);
+  fleet.forEach(u=>{ if(!ordered.includes(u)) ordered.push(u); });
+  urutanFleet = ordered.map(u=>u.id);
+
   html += ordered.map(u=>{
     if(fleetEditId === u.id) return fleetFormHtml(u);
     if(fleetDeleteId === u.id) return fleetConfirmHtml(u);
@@ -799,11 +819,13 @@ function fleetSave(id){
   if(isNaN(active) || active<0) active = total;
   if(active>total) active = total;
   if(isNew){
-    fleet.unshift({id:'u'+(fleetSeq++), name, type: type||'Alat berat', total, active, util:70, status: active===0?'warn':'ok', source:'manual'});
+    const unitBaru = {id:'u'+(fleetSeq++), name, type: type||'Alat berat', total, active, util:70, status:'ok', source:'manual'};
+    unitBaru.status = hitungStatusFleet(unitBaru);
+    fleet.unshift(unitBaru);
     addFleetLog(`Admin tambah unit baru: ${esc(name)} (${total} unit)`);
   } else {
     const u = fleet.find(x=>x.id===id);
-    u.name=name; u.type=type||u.type; u.total=total; u.active=active; u.status= active===0?'warn':'ok'; u.source='manual';
+    u.name=name; u.type=type||u.type; u.total=total; u.active=active; u.source='manual'; u.status = hitungStatusFleet(u);
     addFleetLog(`Admin ubah data ${esc(name)}: ${active}/${total} unit aktif`);
   }
   fleetEditId=null;
