@@ -624,6 +624,14 @@ function esc(s){
 let currentRole = null;
 let appReady = false;
 
+// keadaan sumber data, dideklarasikan di awal karena dipakai banyak bagian
+let sheetConn = null;   // {url, map, lastFetch}
+let riwayat = [];       // [{label, kunci, tx, omzet, buyback}] per tanggal
+let barisSumber = 0;    // jumlah baris mentah dari sumber, untuk keterangan
+let seriesCabang = {};  // nama cabang -> daftar catatan harian, urut tanggal
+let tanggalIdx = -1;    // tanggal yang sedang ditampilkan
+let renderBacaanKe = 0; // penanda supaya jawaban lama tidak menimpa tampilan baru
+
 function doLogin(){
   const pass = document.getElementById('loginPass').value;
   currentRole = (pass === 'admin123') ? 'admin' : 'viewer';
@@ -635,6 +643,7 @@ function doLogin(){
   document.getElementById('loginGate').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
   renderFleet(); renderBranches(); renderCompliance(); renderApprovals();
+  muatSheetContoh();
 }
 
 function doLogout(){
@@ -922,10 +931,10 @@ function branchRowHtml(b){
     <td class="num" data-label="Estimasi omzet"><span class="cell-val">${esc(b.omzet)}</span></td>
     <td data-label="Status"><span class="cell-val"><span class="status ok"><span class="dot"></span>Buka</span></span></td>
     <td class="cell-tools">
-      <div class="rowtools">
+      ${sheetConn ? '' : `<div class="rowtools">
         <button class="edit-btn" title="Edit cabang" onclick="branchStartEdit('${b.id}')">&#9998;</button>
         <button class="del-btn" title="Hapus cabang" onclick="branchStartDelete('${b.id}')">&times;</button>
-      </div>
+      </div>`}
     </td>
   </tr>`;
 }
@@ -981,7 +990,8 @@ function renderBranches(){
   document.getElementById('kpiBranches').textContent = branches.length;
   document.getElementById('retailBadge').textContent = branches.filter(b=>branchDrop(b)<0).length;
   const addBtn = document.getElementById('branchAddBtn');
-  if(addBtn) addBtn.style.display = (currentRole==='admin' && !branchEditId) ? 'inline-block' : 'none';
+  // saat tersambung ke sheet, isi tabel milik sheet, jadi tidak bisa diubah dari sini
+  if(addBtn) addBtn.style.display = (currentRole==='admin' && !branchEditId && !sheetConn) ? 'inline-block' : 'none';
   updateRetailSourceTag();
   renderSheetStatus();
   renderRingkasSumber();
@@ -1030,12 +1040,6 @@ let importData = null;   // {fileName, headers, rows}
 let importMap = null;    // {tanggal, cabang, transaksi, omzet}
 let importedFrom = null; // nama file yang sedang dipakai
 
-let sheetConn = null; // {url, map, lastFetch}
-let riwayat = [];     // [{label, kunci, tx, omzet, buyback}] per tanggal
-let barisSumber = 0;  // jumlah baris mentah dari sumber, untuk keterangan
-let seriesCabang = {};// nama cabang -> daftar catatan harian, urut tanggal
-let tanggalIdx = -1;  // tanggal yang sedang ditampilkan
-let renderBacaanKe = 0; // penanda supaya jawaban lama tidak menimpa tampilan baru
 
 function openImport(){
   if(currentRole!=='admin') return;
@@ -1055,6 +1059,30 @@ function toSheetCsvUrl(raw){
     return `https://docs.google.com/spreadsheets/d/${m2[1]}/gviz/tq?tqx=out:csv` + (gid ? `&gid=${gid}` : '');
   }
   return null;
+}
+
+// Sheet contoh yang dimuat sendiri saat dashboard dibuka, supaya pengunjung
+// langsung melihat data harian, grafik, dan analisa tanpa perlu hak admin.
+const SHEET_CONTOH = 'https://docs.google.com/spreadsheets/d/1ljfmM5HMj02uCiPeQY61w-ECVh4wOMoYKAXOYuF-_tk/edit';
+let sudahCobaMuatSendiri = false;
+
+async function muatSheetContoh(){
+  if(sudahCobaMuatSendiri || sheetConn || importedFrom) return;
+  sudahCobaMuatSendiri = true;
+  const url = toSheetCsvUrl(SHEET_CONTOH);
+  if(!url) return;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('status '+res.status);
+    const parsed = parseSheet(await res.text());
+    if(!parsed || !parsed.rows.length) throw new Error('kosong');
+    importData = {fileName:'Google Sheet', headers:parsed.headers, rows:parsed.rows, source:'sheet', url};
+    importMap = tebakKolom(parsed.headers);
+    applyImport();
+  }catch(e){
+    // gagal berarti tetap pakai data simulasi bawaan, tidak ada yang rusak
+    importData = null; importMap = null;
+  }
 }
 
 function openSheetForm(){
@@ -1131,7 +1159,7 @@ function renderSheetStatus(){
   <div class="sheet-live">
     <div>
       <div class="info">Tersambung ke Google Sheet</div>
-      <div class="sub">Angka di tabel ini dibaca langsung dari sheet. Terakhir diperbarui ${sheetConn.lastFetch}</div>
+      <div class="sub">Angka di tabel ini dibaca langsung dari sheet, jadi tidak bisa diubah dari sini. Untuk mengubah, edit di sheet lalu klik Perbarui data. Terakhir diperbarui ${sheetConn.lastFetch}</div>
     </div>
     <div class="acts">
       <button class="btn" onclick="refreshSheet()">Perbarui data</button>
@@ -1340,6 +1368,8 @@ function applyImport(){
   importedFrom = importData.fileName;
   if(importData.source === 'sheet'){
     sheetConn = {url: importData.url, map: {...importMap}, lastFetch: nowLabel()};
+  } else {
+    sheetConn = null;   // sumber pindah ke file, koneksi sheet tidak berlaku lagi
   }
   importData = null; importMap = null;
   document.getElementById('importPanel').innerHTML = '';
@@ -1412,12 +1442,12 @@ function renderRingkasSumber(){
   const el = document.getElementById('ringkasSumber');
   if(!el) return;
   if(!barisSumber){ el.textContent = ''; return; }
-  const tglTerakhir = riwayat.length ? riwayat[riwayat.length-1].label : null;
+  const tglAktif = (tanggalIdx > -1 && riwayat[tanggalIdx]) ? riwayat[tanggalIdx].label : null;
   let teks = `${barisSumber} baris terbaca, dikelompokkan jadi ${branches.length} cabang`;
   if(riwayat.length > 1){
-    teks += ` dari ${riwayat.length} tanggal. Tabel di bawah menampilkan kondisi ${tglTerakhir}, tanggal sebelumnya dipakai untuk perbandingan dan grafik.`;
-  } else if(tglTerakhir){
-    teks += `. Semua baris bertanggal ${tglTerakhir}.`;
+    teks += ` dari ${riwayat.length} tanggal. Tabel di bawah menampilkan kondisi ${tglAktif}, tanggal sebelumnya dipakai untuk perbandingan dan grafik.`;
+  } else if(tglAktif){
+    teks += `. Semua baris bertanggal ${tglAktif}.`;
   } else {
     teks += '. Sumber tidak punya kolom tanggal, jadi semua baris dianggap satu periode.';
   }
@@ -1429,10 +1459,15 @@ function updateRetailSourceTag(){
   const tag = document.getElementById('retailSourceTag');
   const resetBtn = document.getElementById('importResetBtn');
   if(tag){
-    if(sheetConn){
+    if(sheetConn && currentRole === 'admin'){
       // kotak hijau di bawah sudah menjelaskan sumbernya, tidak perlu diulang
       tag.style.display = 'none';
       tag.className = '';
+    } else if(sheetConn){
+      // viewer tidak melihat kotak hijau, jadi sumbernya tetap harus dijelaskan
+      tag.style.display = '';
+      tag.className = 'src-note';
+      tag.textContent = 'Angka di bawah dibaca langsung dari Google Sheet contoh, bukan angka penjualan asli';
     } else if(importedFrom){
       tag.style.display = '';
       tag.className = 'src-note';
