@@ -963,6 +963,7 @@ let importedFrom = null; // nama file yang sedang dipakai
 
 let sheetConn = null; // {url, map, lastFetch}
 let riwayat = [];     // [{label, kunci, tx, omzet, buyback}] per tanggal
+let renderBacaanKe = 0; // penanda supaya jawaban lama tidak menimpa tampilan baru
 
 function openImport(){
   if(currentRole!=='admin') return;
@@ -1398,6 +1399,24 @@ function otakBaca(bahan){
   return temuan;
 }
 
+// Alamat perantara analisa. Kosong berarti pakai logika biasa saja.
+const ALAMAT_ANALISA = 'https://analisa-kisara.imageresizer.workers.dev';
+
+function daftarTemuanHtml(temuan){
+  return temuan.map(t=>`<li class="b-${t.tingkat}"><span class="tanda"></span><span>${esc(t.teks)}</span></li>`).join('');
+}
+
+function bingkaiBacaan(temuan, catatanSumber){
+  return `
+  <div class="bacaan">
+    <div class="bacaan-head">
+      <span class="bacaan-title">Analisa otomatis</span>
+      <span class="bacaan-note">${esc(catatanSumber)}</span>
+    </div>
+    <ul class="bacaan-list">${daftarTemuanHtml(temuan)}</ul>
+  </div>`;
+}
+
 function renderBacaan(){
   if(!appReady) return;
   const box = document.getElementById('bacaanPanel');
@@ -1409,17 +1428,29 @@ function renderBacaan(){
     return;
   }
 
-  const temuan = otakBaca(bahanBacaan());
-  box.innerHTML = `
-  <div class="bacaan">
-    <div class="bacaan-head">
-      <span class="bacaan-title">Analisa otomatis</span>
-      <span class="bacaan-note">Disusun dari angka dan catatan di sumber data, bukan tebakan</span>
-    </div>
-    <ul class="bacaan-list">
-      ${temuan.map(t=>`<li class="b-${t.tingkat}"><span class="tanda"></span><span>${esc(t.teks)}</span></li>`).join('')}
-    </ul>
-  </div>`;
+  const bahan = bahanBacaan();
+  // tampilkan hasil logika biasa dulu supaya panel tidak pernah kosong
+  box.innerHTML = bingkaiBacaan(otakBaca(bahan), 'Disusun dari angka dan catatan di sumber data, bukan tebakan');
+  if(ALAMAT_ANALISA) mintaAnalisaAI(bahan, box);
+}
+
+async function mintaAnalisaAI(bahan, box){
+  const penanda = ++renderBacaanKe;
+  try{
+    const r = await fetch(ALAMAT_ANALISA, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({bahan})
+    });
+    if(!r.ok) throw new Error('status '+r.status);
+    const data = await r.json();
+    if(!data || !Array.isArray(data.temuan) || !data.temuan.length) throw new Error('kosong');
+    // kalau sudah ada render lain yang lebih baru, jangan timpa
+    if(penanda !== renderBacaanKe) return;
+    box.innerHTML = bingkaiBacaan(data.temuan, 'Dibaca dari angka dan catatan di sumber data, termasuk catatan berbentuk kalimat bebas');
+  }catch(e){
+    // diam saja, hasil logika biasa yang sudah tampil tetap dipakai
+  }
 }
 
 /* =========================================================
