@@ -83,6 +83,51 @@
   .att-clear{font-size:12.5px; color:var(--ok); font-weight:600; display:flex; align-items:center; gap:7px;}
   .att-clear .dot{width:7px; height:7px; border-radius:50%; background:var(--ok);}
   .stamp{font-size:11.5px; color:var(--gray-400); margin-top:12px;}
+
+  /* ---------- IMPOR SPREADSHEET ---------- */
+  .retail-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .import-panel{
+    border:1px solid var(--line); border-radius:var(--radius); padding:20px;
+    margin-top:16px; background:var(--gray-50);
+  }
+  .import-head{font-size:13.5px; font-weight:700; margin-bottom:4px;}
+  .import-sub{font-size:12px; color:var(--gray-500); line-height:1.5;}
+  .import-file{font-size:12px; color:var(--gray-500); margin-top:14px;}
+  .import-file b{color:var(--black);}
+  .map-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:16px;}
+  .map-field label{font-size:11px; color:var(--gray-500); display:block; margin-bottom:5px;}
+  .map-field select{
+    width:100%; border:1px solid var(--line); border-radius:8px; padding:8px 10px;
+    font-size:13px; font-family:inherit; background:var(--white); color:var(--black);
+  }
+  .map-field select:focus{outline:none; border-color:var(--accent);}
+  .map-hint{font-size:11px; color:var(--gray-400); margin-top:4px;}
+  .import-preview{margin-top:18px; overflow-x:auto;}
+  .import-preview table{border-collapse:collapse; font-size:12px; width:100%;}
+  .import-preview th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--gray-500); font-weight:700; padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  .import-preview td{padding:7px 10px; border-bottom:1px solid var(--gray-100); white-space:nowrap;}
+  .import-error{
+    margin-top:14px; padding:11px 14px; border-radius:8px;
+    background:var(--danger-bg); color:var(--danger); font-size:12px; font-weight:600;
+  }
+  .url-input{
+    width:100%; border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+    font-size:13px; font-family:inherit; color:var(--black); background:var(--white); margin-top:12px;
+  }
+  .url-input:focus{outline:none; border-color:var(--accent);}
+  .sheet-live{
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    border:1px solid var(--ok); background:var(--ok-bg); border-radius:var(--radius);
+    padding:14px 18px; margin-top:16px;
+  }
+  .sheet-live .info{font-size:12.5px; color:var(--ok); font-weight:600;}
+  .sheet-live .sub{font-size:11.5px; color:var(--gray-500); font-weight:500; margin-top:3px;}
+  .sheet-live .acts{display:flex; gap:8px;}
+  .steps{margin:12px 0 0; padding-left:18px; font-size:12px; color:var(--gray-500); line-height:1.9;}
+  .steps b{color:var(--black);}
   .delta{font-size:12px; font-weight:700; margin-left:10px; display:inline-flex; align-items:center; gap:3px; cursor:default;}
   .delta .arrow{font-size:8.5px; line-height:1;}
   .delta.up{color:var(--ok);}
@@ -444,9 +489,18 @@
       </div>
     </div>
 
-    <div style="margin-top:18px;" class="sim-tag">Kolom transaksi dan omzet: data simulasi, bukan angka asli</div>
+    <div style="margin-top:18px;" class="sim-tag" id="retailSourceTag">Kolom transaksi dan omzet: data simulasi, bukan angka asli</div>
 
-    <button class="btn admin-add" id="branchAddBtn" onclick="branchStartAdd()">+ Tambah cabang</button>
+    <div class="retail-actions">
+      <button class="btn admin-add" id="branchAddBtn" onclick="branchStartAdd()">+ Tambah cabang</button>
+      <button class="btn primary admin-add" id="sheetBtn" onclick="openSheetForm()">Sambungkan Google Sheet</button>
+      <button class="btn admin-add" id="importBtn" onclick="openImport()">Impor file</button>
+      <button class="btn admin-add" id="importResetBtn" onclick="resetImport()" style="display:none;">Kembali ke data contoh</button>
+      <input type="file" id="importFile" accept=".csv,.tsv,.txt" style="display:none;" onchange="handleImportFile(this)">
+    </div>
+
+    <div id="sheetStatus"></div>
+    <div id="importPanel"></div>
 
     <div class="table-scroll">
     <table class="branch-table">
@@ -826,6 +880,8 @@ function renderBranches(){
   document.getElementById('retailBadge').textContent = branches.filter(b=>branchDrop(b)<0).length;
   const addBtn = document.getElementById('branchAddBtn');
   if(addBtn) addBtn.style.display = (currentRole==='admin' && !branchEditId) ? 'inline-block' : 'none';
+  updateRetailSourceTag();
+  renderSheetStatus();
   renderAttention();
 }
 renderBranches();
@@ -858,6 +914,337 @@ function branchSave(id){
   }
   branchEditId=null;
   renderBranches();
+}
+
+/* =========================================================
+   IMPOR SPREADSHEET
+   ========================================================= */
+const branchesDemo = branches.map(b=>({...b}));
+let importData = null;   // {fileName, headers, rows}
+let importMap = null;    // {tanggal, cabang, transaksi, omzet}
+let importedFrom = null; // nama file yang sedang dipakai
+
+let sheetConn = null; // {url, map, lastFetch}
+
+function openImport(){
+  if(currentRole!=='admin') return;
+  document.getElementById('importFile').click();
+}
+
+// ubah macam-macam bentuk URL Google Sheet jadi alamat yang bisa dibaca
+function toSheetCsvUrl(raw){
+  const u = String(raw||'').trim();
+  if(!u) return null;
+  if(u.includes('output=csv') || u.includes('tqx=out:csv')) return u;
+  const m = u.match(/\/spreadsheets\/d\/e\/([a-zA-Z0-9_-]+)/);
+  if(m) return `https://docs.google.com/spreadsheets/d/e/${m[1]}/pub?output=csv`;
+  const m2 = u.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if(m2){
+    const gid = (u.match(/[#&?]gid=(\d+)/) || [])[1];
+    return `https://docs.google.com/spreadsheets/d/${m2[1]}/gviz/tq?tqx=out:csv` + (gid ? `&gid=${gid}` : '');
+  }
+  return null;
+}
+
+function openSheetForm(){
+  if(currentRole!=='admin') return;
+  const box = document.getElementById('importPanel');
+  box.innerHTML = `
+  <div class="import-panel">
+    <div class="import-head">Sambungkan ke Google Sheet</div>
+    <div class="import-sub">Dashboard baca isi sheet langsung. Sheet-nya tetap milik kalian dan tidak akan diubah dari sini.</div>
+    <input class="url-input" id="sheetUrl" placeholder="Tempel alamat Google Sheet di sini" value="${sheetConn ? esc(sheetConn.url) : ''}">
+    <ol class="steps">
+      <li>Di Google Sheet, buka menu <b>File</b> lalu <b>Bagikan</b> lalu <b>Publikasikan ke web</b></li>
+      <li>Pilih format <b>CSV</b>, klik <b>Publikasikan</b></li>
+      <li>Salin alamat yang muncul, tempel di kolom atas</li>
+    </ol>
+    <div id="sheetError"></div>
+    <div class="edit-actions" style="margin-top:16px;">
+      <button class="btn primary" onclick="fetchSheet()">Tarik data</button>
+      <button class="btn" onclick="cancelImport()">Batal</button>
+    </div>
+  </div>`;
+}
+
+async function fetchSheet(){
+  const input = document.getElementById('sheetUrl');
+  const err = document.getElementById('sheetError');
+  const url = toSheetCsvUrl(input ? input.value : '');
+  if(!url){
+    if(err) err.innerHTML = `<div class="import-error">Alamat tidak dikenali. Pastikan itu alamat Google Sheet.</div>`;
+    return;
+  }
+  if(err) err.innerHTML = `<div class="import-file">Menarik data...</div>`;
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('status ' + res.status);
+    const text = await res.text();
+    const parsed = parseSheet(text);
+    if(!parsed || !parsed.rows.length) throw new Error('isi kosong');
+    const h = parsed.headers;
+    importData = {fileName: 'Google Sheet', headers: h, rows: parsed.rows, source: 'sheet', url};
+    importMap = sheetConn ? sheetConn.map : {
+      tanggal: guessCol(h, ['tanggal','date','tgl']),
+      cabang: guessCol(h, ['cabang','toko','outlet','store','lokasi','nama']),
+      transaksi: guessCol(h, ['total trx','total transaksi','jumlah transaksi','jml transaksi','transaksi','trx','jumlah','qty','order']),
+      omzet: guessCol(h, ['omzet','penjualan','sales','nominal','rupiah','total'])
+    };
+    renderImportPanel();
+  }catch(e){
+    if(err) err.innerHTML = `<div class="import-error">Gagal menarik data. Pastikan sheet sudah dipublikasikan ke web lewat File, Bagikan, Publikasikan ke web. (${esc(e.message)})</div>`;
+  }
+}
+
+async function refreshSheet(){
+  if(!sheetConn) return;
+  const status = document.getElementById('sheetStatus');
+  try{
+    const res = await fetch(sheetConn.url + (sheetConn.url.includes('?') ? '&' : '?') + 't=' + Date.now());
+    const text = await res.text();
+    const parsed = parseSheet(text);
+    if(!parsed || !parsed.rows.length) throw new Error('isi kosong');
+    importData = {fileName:'Google Sheet', headers: parsed.headers, rows: parsed.rows, source:'sheet', url: sheetConn.url};
+    importMap = sheetConn.map;
+    applyImport();
+  }catch(e){
+    if(status) status.innerHTML = `<div class="import-panel"><div class="import-error">Gagal menarik ulang. ${esc(e.message)}</div></div>`;
+  }
+}
+
+function disconnectSheet(){
+  sheetConn = null;
+  resetImport();
+}
+
+function renderSheetStatus(){
+  if(!appReady) return;
+  const box = document.getElementById('sheetStatus');
+  if(!box) return;
+  if(!sheetConn || currentRole!=='admin'){ box.innerHTML = ''; return; }
+  box.innerHTML = `
+  <div class="sheet-live">
+    <div>
+      <div class="info">Tersambung ke Google Sheet</div>
+      <div class="sub">Data ditarik langsung dari sheet. Terakhir ${sheetConn.lastFetch}</div>
+    </div>
+    <div class="acts">
+      <button class="btn" onclick="refreshSheet()">Tarik ulang</button>
+      <button class="btn" onclick="disconnectSheet()">Putuskan</button>
+    </div>
+  </div>`;
+}
+
+function splitLine(line, sep){
+  const out = []; let cur = ''; let quoted = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(ch === '"'){
+      if(quoted && line[i+1] === '"'){ cur += '"'; i++; }
+      else quoted = !quoted;
+    } else if(ch === sep && !quoted){ out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(s=>s.trim());
+}
+
+function parseSheet(text){
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim()!=='');
+  if(!lines.length) return null;
+  const sep = (lines[0].split('\t').length > lines[0].split(',').length) ? '\t' : ',';
+  const headers = splitLine(lines[0], sep);
+  const rows = lines.slice(1).map(l=>splitLine(l, sep)).filter(r=>r.some(c=>c!==''));
+  return {headers, rows};
+}
+
+function guessCol(headers, keywords){
+  for(const kw of keywords){
+    const i = headers.findIndex(h=>h.toLowerCase().includes(kw));
+    if(i > -1) return i;
+  }
+  return -1;
+}
+
+function handleImportFile(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const parsed = parseSheet(String(e.target.result||''));
+    input.value = '';
+    if(!parsed || !parsed.rows.length){
+      document.getElementById('importPanel').innerHTML =
+        `<div class="import-panel"><div class="import-error">File tidak terbaca atau isinya kosong. Pastikan formatnya CSV.</div></div>`;
+      return;
+    }
+    importData = {fileName: file.name, headers: parsed.headers, rows: parsed.rows};
+    const h = parsed.headers;
+    importMap = {
+      tanggal: guessCol(h, ['tanggal','date','tgl']),
+      cabang: guessCol(h, ['cabang','toko','outlet','store','lokasi','nama']),
+      transaksi: guessCol(h, ['total trx','total transaksi','jumlah transaksi','jml transaksi','transaksi','trx','jumlah','qty','order']),
+      omzet: guessCol(h, ['omzet','penjualan','sales','nominal','rupiah','total'])
+    };
+    renderImportPanel();
+  };
+  reader.readAsText(file);
+}
+
+function setMap(field, value){
+  if(!importMap) return;
+  importMap[field] = parseInt(value,10);
+  renderImportPanel();
+}
+
+function renderImportPanel(){
+  const box = document.getElementById('importPanel');
+  if(!importData){ box.innerHTML = ''; return; }
+  const h = importData.headers;
+  const opt = (sel) => h.map((name,i)=>
+    `<option value="${i}" ${i===sel?'selected':''}>${esc(name||'(kolom '+(i+1)+')')}</option>`
+  ).join('');
+
+  const field = (key, label, hint, wajib) => `
+    <div class="map-field">
+      <label>${label}${wajib?'':' <span style="color:var(--gray-400)">(opsional)</span>'}</label>
+      <select onchange="setMap('${key}', this.value)">
+        <option value="-1" ${importMap[key]===-1?'selected':''}>Tidak ada</option>
+        ${opt(importMap[key])}
+      </select>
+      <div class="map-hint">${hint}</div>
+    </div>`;
+
+  const previewRows = importData.rows.slice(0,3).map(r=>
+    `<tr>${h.map((_,i)=>`<td>${esc(r[i]||'')}</td>`).join('')}</tr>`
+  ).join('');
+
+  const siap = importMap.cabang > -1 && importMap.transaksi > -1;
+
+  box.innerHTML = `
+  <div class="import-panel">
+    <div class="import-head">Cocokkan kolom file dengan dashboard</div>
+    <div class="import-sub">Nama kolom di file kalian tidak harus sama. Pilih sendiri kolom mana yang dipakai.</div>
+    <div class="import-file">File: <b>${esc(importData.fileName)}</b>, ${importData.rows.length} baris terbaca</div>
+    <div class="map-grid">
+      ${field('cabang','Nama cabang','Dipakai sebagai judul tiap baris', true)}
+      ${field('transaksi','Jumlah transaksi','Angka. Teks non-angka diabaikan', true)}
+      ${field('omzet','Nilai omzet','Boleh ada Rp dan titik', false)}
+      ${field('tanggal','Tanggal','Kalau ada, dipakai untuk bandingkan hari sebelumnya', false)}
+    </div>
+    <div class="import-preview">
+      <table>
+        <thead><tr>${h.map(n=>`<th>${esc(n)}</th>`).join('')}</tr></thead>
+        <tbody>${previewRows}</tbody>
+      </table>
+    </div>
+    ${!siap ? `<div class="import-error">Pilih dulu kolom nama cabang dan jumlah transaksi.</div>` : ''}
+    <div class="edit-actions" style="margin-top:18px;">
+      <button class="btn primary" ${siap?'':'disabled style="opacity:.45; cursor:not-allowed;"'} onclick="${siap?'applyImport()':''}">Pakai data ini</button>
+      <button class="btn" onclick="cancelImport()">Batal</button>
+    </div>
+  </div>`;
+}
+
+function cancelImport(){
+  importData = null; importMap = null;
+  document.getElementById('importPanel').innerHTML = '';
+}
+
+// ubah macam-macam format tanggal jadi angka yang bisa diurutkan
+function tanggalKunci(s){
+  const t = String(s||'').trim();
+  if(!t) return 0;
+  let m = t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);      // 2026-08-10
+  if(m) return (+m[1])*10000 + (+m[2])*100 + (+m[3]);
+  m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);          // 10/08/2026
+  if(m) return (+m[3])*10000 + (+m[2])*100 + (+m[1]);
+  const d = new Date(t);
+  return isNaN(d) ? 0 : d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate();
+}
+
+function toNumber(v){
+  const n = String(v==null?'':v).replace(/[^0-9-]/g,'');
+  return n ? parseInt(n,10) : 0;
+}
+
+function formatRupiah(n){
+  return 'Rp' + Number(n||0).toLocaleString('id-ID');
+}
+
+function applyImport(){
+  if(!importData || !importMap) return;
+  const {rows} = importData;
+  const mCab = importMap.cabang, mTx = importMap.transaksi;
+  const mOmz = importMap.omzet, mTgl = importMap.tanggal;
+
+  // kelompokkan per cabang, simpan urut tanggal kalau ada
+  const perCabang = {};
+  rows.forEach(r=>{
+    const nama = String(r[mCab]||'').trim();
+    if(!nama) return;
+    if(!perCabang[nama]) perCabang[nama] = [];
+    perCabang[nama].push({
+      tgl: mTgl > -1 ? String(r[mTgl]||'').trim() : '',
+      tx: toNumber(r[mTx]),
+      omzet: mOmz > -1 ? toNumber(r[mOmz]) : null
+    });
+  });
+
+  const hasil = Object.keys(perCabang).map(nama=>{
+    const catatan = perCabang[nama];
+    if(mTgl > -1) catatan.sort((a,b)=> tanggalKunci(a.tgl) - tanggalKunci(b.tgl));
+    const terakhir = catatan[catatan.length-1];
+    const sebelum = catatan.length > 1 ? catatan[catatan.length-2] : null;
+    return {
+      id: 'b'+(branchSeq++),
+      name: nama,
+      addr: mTgl > -1 && terakhir.tgl ? 'Data per ' + terakhir.tgl : 'Dari file impor',
+      tx: terakhir.tx,
+      txPrev: sebelum ? sebelum.tx : terakhir.tx,
+      omzet: terakhir.omzet !== null ? formatRupiah(terakhir.omzet) : 'Tidak diisi'
+    };
+  });
+
+  if(!hasil.length){
+    document.getElementById('importPanel').innerHTML =
+      `<div class="import-panel"><div class="import-error">Tidak ada baris yang bisa dipakai. Cek lagi pilihan kolom nama cabang.</div></div>`;
+    return;
+  }
+
+  branches.length = 0;
+  hasil.forEach(b=>branches.push(b));
+  importedFrom = importData.fileName;
+  if(importData.source === 'sheet'){
+    sheetConn = {url: importData.url, map: {...importMap}, lastFetch: nowLabel()};
+  }
+  importData = null; importMap = null;
+  document.getElementById('importPanel').innerHTML = '';
+  renderSheetStatus();
+  renderBranches();
+}
+
+function resetImport(){
+  branches.length = 0;
+  branchesDemo.forEach(b=>branches.push({...b}));
+  importedFrom = null;
+  document.getElementById('importPanel').innerHTML = '';
+  renderSheetStatus();
+  renderBranches();
+}
+
+function updateRetailSourceTag(){
+  if(!appReady) return;
+  const tag = document.getElementById('retailSourceTag');
+  const resetBtn = document.getElementById('importResetBtn');
+  if(tag){
+    tag.textContent = sheetConn
+      ? 'Angka di bawah ditarik langsung dari Google Sheet, bukan data simulasi'
+      : importedFrom
+        ? `Angka di bawah dari file ${importedFrom}, bukan data simulasi`
+        : 'Kolom transaksi dan omzet: data simulasi, bukan angka asli';
+  }
+  if(resetBtn) resetBtn.style.display = (importedFrom && currentRole==='admin') ? 'inline-block' : 'none';
 }
 
 /* =========================================================
